@@ -48,6 +48,28 @@ class LibraryPersistenceTests(unittest.TestCase):
             self.assertEqual(connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(connection.execute("PRAGMA journal_mode").fetchone()[0].lower(), "wal")
 
+    def test_database_initialization_reuses_existing_database(self):
+        migrations.initialize_database()
+        download_id = downloads_repo.create_download_record(
+            job_id="job-existing",
+            post_id="existing123",
+            title="Existing",
+            subreddit="pics",
+            author="user",
+            media_type="image",
+            download_scope="single",
+            status="completed",
+        )
+
+        downloads_repo._schema_ready = False
+        migrations.initialize_database()
+
+        with connect() as connection:
+            rows = connection.execute("SELECT id, post_id FROM downloads").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["id"], download_id)
+        self.assertEqual(rows[0]["post_id"], "existing123")
+
     def test_relative_paths_persist_and_absolute_escape_rejected(self):
         download_root = Path(settings.download_dir)
         media = download_root / "images" / "example.jpg"
@@ -84,6 +106,34 @@ class LibraryPersistenceTests(unittest.TestCase):
         self.assertEqual(stats["files_missing"], 1)
         row = downloads_repo.list_downloads(status_filter="completed")[0]
         self.assertEqual(row["availability"], "missing")
+
+    def test_reconciliation_preserves_existing_file_records(self):
+        migrations.initialize_database()
+        media = Path(settings.download_dir) / "images" / "kept.jpg"
+        media.parent.mkdir(parents=True, exist_ok=True)
+        media.write_bytes(b"image")
+        download_id = downloads_repo.create_download_record(
+            job_id="job-kept",
+            post_id="kept123",
+            title="Kept",
+            subreddit="pics",
+            author="user",
+            media_type="image",
+            download_scope="single",
+            status="completed",
+        )
+        downloads_repo.add_file_record(job_id="job-kept", path=media, category="images")
+        downloads_repo.update_download_status("job-kept", "completed", expected_file_count=1)
+
+        stats = reconcile_library()
+        row = downloads_repo.list_downloads(status_filter="completed")[0]
+        files = downloads_repo.files_for_download(download_id)
+
+        self.assertEqual(stats["files_missing"], 0)
+        self.assertEqual(row["availability"], "available")
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]["relative_path"], "images/kept.jpg")
+        self.assertEqual(files[0]["exists_on_disk"], 1)
 
     def test_interrupted_jobs_mark_failed(self):
         migrations.initialize_database()

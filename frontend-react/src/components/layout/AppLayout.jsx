@@ -69,7 +69,12 @@ export function AppLayout({
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
-        {activeSection === "downloads" ? <DownloadsPage /> : <SearchPage />}
+        <div hidden={activeSection !== "search"}>
+          <SearchPage />
+        </div>
+        <div hidden={activeSection !== "downloads"}>
+          <DownloadsPage />
+        </div>
       </AppShell.Main>
     </AppShell>
   );
