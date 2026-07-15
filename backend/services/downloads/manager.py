@@ -18,7 +18,7 @@ from backend.models.downloads import (
     DownloadedFile,
 )
 from backend.services.downloads.direct import download_direct_url
-from backend.services.downloads.errors import DownloadCancelled, DownloadError, MediaResolutionError
+from backend.services.downloads.errors import DuplicateDownloadError, DownloadCancelled, DownloadError, MediaResolutionError
 from backend.services.downloads.gallery import download_gallery_urls
 from backend.services.downloads.resolver import RETRYABLE_RESOLUTION_CODES, resolve_download_request
 from backend.services.reddit.media_cache import normalized_media_cache
@@ -30,25 +30,29 @@ from backend.utils.logging import get_logger
 
 
 logger = get_logger(__name__)
-TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
-NON_TERMINAL_STATUSES = {"queued", "resolving", "downloading", "merging"}
-ACTIVE_STATUSES = {"resolving", "downloading", "merging"}
+TERMINAL_STATUSES = {"completed", "completed_with_errors", "failed", "cancelled"}
+NON_TERMINAL_STATUSES = {"queued", "resolving", "downloading", "merging", "finalizing"}
+ACTIVE_STATUSES = {"resolving", "downloading", "merging", "finalizing"}
 RETRYABLE_STATUSES = {"failed", "cancelled"}
 SUMMARY_ORDER = {
     "resolving": 0,
     "downloading": 0,
     "merging": 0,
+    "finalizing": 0,
     "queued": 1,
     "failed": 2,
-    "completed": 3,
+    "completed_with_errors": 3,
+    "completed": 4,
     "cancelled": 4,
 }
 LEGAL_TRANSITIONS = {
     "queued": {"resolving", "downloading", "failed", "cancelled"},
     "resolving": {"downloading", "failed", "cancelled"},
-    "downloading": {"merging", "completed", "failed", "cancelled"},
-    "merging": {"completed", "failed", "cancelled"},
+    "downloading": {"merging", "finalizing", "completed", "completed_with_errors", "failed", "cancelled"},
+    "merging": {"finalizing", "completed", "completed_with_errors", "failed", "cancelled"},
+    "finalizing": {"completed", "completed_with_errors", "failed", "cancelled"},
     "completed": set(),
+    "completed_with_errors": set(),
     "failed": set(),
     "cancelled": set(),
 }
@@ -75,6 +79,12 @@ class DownloadJob:
     completed_at_wall: datetime | None = None
     partial_paths: set[Path] = field(default_factory=set)
     library_download_id: str | None = None
+    retry_of_id: str | None = None
+    warnings: list[dict[str, str]] = field(default_factory=list)
+    succeeded_count: int | None = None
+    failed_count: int | None = None
+    _last_progress_persisted_at: float = 0
+    _last_progress_persisted_value: int | None = None
 
 
 class DownloadJobManager:
@@ -84,15 +94,30 @@ class DownloadJobManager:
         self.semaphore = asyncio.Semaphore(max_concurrent or settings.max_concurrent_downloads)
         logger.info("download.ffmpeg.status available=%s", ffmpeg_available())
 
-    async def create_job(self, request: DownloadRequest) -> DownloadJob:
+    async def create_job(self, request: DownloadRequest, retry_of_download_id: str | None = None) -> DownloadJob:
         self.cleanup_jobs()
         if not has_minimum_free_space(settings.download_dir_path):
             raise DownloadError("Not enough free disk space to start this download.")
         duplicate = duplicate_for_request(request)
-        if duplicate is not None:
-            raise DownloadError("This media already exists in your library.")
-        job = DownloadJob(job_id=str(uuid.uuid4()), request=request)
-        job.library_download_id = library_persistence.create_download(job.job_id, request)
+        if duplicate is not None and not request.force_download and retry_of_download_id is None:
+            logger.info(
+                "download.duplicate.detected post_id=%s duplicate_type=exact_download_exists status=%s",
+                request.post_id,
+                duplicate["status"],
+            )
+            raise DuplicateDownloadError(
+                {
+                    "type": "exact_download_exists",
+                    "existing_download_id": str(duplicate["id"]),
+                    "availability": str(duplicate["availability"]),
+                }
+            )
+        if duplicate is not None and request.force_download:
+            logger.info("download.duplicate.bypassed post_id=%s duplicate_type=exact_download_exists", request.post_id)
+        job = DownloadJob(job_id=str(uuid.uuid4()), request=request, retry_of_id=retry_of_download_id)
+        result = library_persistence.create_download(job.job_id, request, retry_of_id=retry_of_download_id)
+        job.library_download_id = str(result.value) if result.value else None
+        self._apply_persistence_warning(job, result)
         with self.lock:
             self.jobs[job.job_id] = job
         logger.info(
@@ -146,10 +171,11 @@ class DownloadJobManager:
                 )
                 raise DownloadError("Only failed or cancelled downloads can be retried.")
             request = job.request.model_copy(deep=True)
+            retry_of_download_id = job.library_download_id
             if job.error_code in RETRYABLE_RESOLUTION_CODES:
                 normalized_media_cache.invalidate(request.post_id)
                 request.force_hydrate = True
-        new_job = await self.create_job(request)
+        new_job = await self.create_job(request, retry_of_download_id=retry_of_download_id)
         logger.info(
             "download.job.retry.success old_job_id=%s new_job_id=%s elapsed_ms=%s",
             job_id,
@@ -206,7 +232,7 @@ class DownloadJobManager:
                     continue
                 del self.jobs[job_id]
                 stats["jobs_removed"] += 1
-                if job.status == "completed":
+                if job.status in {"completed", "completed_with_errors"}:
                     stats["completed_removed"] += 1
                 elif job.status == "failed":
                     stats["failed_removed"] += 1
@@ -226,7 +252,7 @@ class DownloadJobManager:
 
     def active_counts(self) -> tuple[int, int]:
         with self.lock:
-            active = sum(1 for job in self.jobs.values() if job.status in {"resolving", "downloading", "merging"})
+            active = sum(1 for job in self.jobs.values() if job.status in ACTIVE_STATUSES)
             queued = sum(1 for job in self.jobs.values() if job.status == "queued")
         return active, queued
 
@@ -238,19 +264,14 @@ class DownloadJobManager:
         return cleanup_stale_part_files(active_part_paths=self.active_part_paths())
 
     def transition_job(self, job: DownloadJob, new_status: str, **updates: object) -> bool:
+        should_persist = False
         with self.lock:
             if job.status == new_status:
                 for key, value in updates.items():
                     setattr(job, key, value)
                 job.updated_at = monotonic()
-                library_persistence.update_status(
-                    job.job_id,
-                    new_status,
-                    error_code=getattr(job, "error_code", None),
-                    error_message=getattr(job, "error", None),
-                )
-                return True
-            if new_status not in LEGAL_TRANSITIONS.get(job.status, set()):
+                should_persist = self._should_persist_progress(job)
+            elif new_status not in LEGAL_TRANSITIONS.get(job.status, set()):
                 logger.warning(
                     "download.job.transition.invalid job_id=%s from_status=%s to_status=%s",
                     job.job_id,
@@ -258,23 +279,29 @@ class DownloadJobManager:
                     new_status,
                 )
                 return False
-            job.status = new_status
-            for key, value in updates.items():
-                setattr(job, key, value)
-            job.updated_at = monotonic()
-            if new_status in ACTIVE_STATUSES and job.started_at_wall is None:
-                job.started_at_wall = datetime.now(timezone.utc)
-            if new_status in TERMINAL_STATUSES:
-                job.completed_at_wall = datetime.now(timezone.utc)
-            if new_status == "cancelled":
-                logger.info("download.job.cancelled job_id=%s", job.job_id)
-            library_persistence.update_status(
+            else:
+                job.status = new_status
+                for key, value in updates.items():
+                    setattr(job, key, value)
+                job.updated_at = monotonic()
+                if new_status in ACTIVE_STATUSES and job.started_at_wall is None:
+                    job.started_at_wall = datetime.now(timezone.utc)
+                if new_status in TERMINAL_STATUSES:
+                    job.completed_at_wall = datetime.now(timezone.utc)
+                if new_status == "cancelled":
+                    logger.info("download.job.cancelled job_id=%s", job.job_id)
+                should_persist = True
+            error_code = getattr(job, "error_code", None)
+            error_message = getattr(job, "error", None)
+        if should_persist:
+            result = library_persistence.update_status(
                 job.job_id,
                 new_status,
-                error_code=getattr(job, "error_code", None),
-                error_message=getattr(job, "error", None),
+                error_code=error_code,
+                error_message=error_message,
             )
-            return True
+            self._apply_persistence_warning(job, result)
+        return True
 
     async def _run_job(self, job: DownloadJob) -> None:
         async with self.semaphore:
@@ -311,8 +338,19 @@ class DownloadJobManager:
                 else:
                     raise DownloadError("The selected media cannot be downloaded.")
 
-                library_persistence.finalize_download(job.job_id, expected_file_count=len(resolved.urls))
-                if self.transition_job(job, "completed", progress=100, message=job.message or "Download completed"):
+                if job.cancel_event.is_set() or job.status in TERMINAL_STATUSES:
+                    return
+                if not self.transition_job(job, "finalizing", progress=99, message="Saving file metadata..."):
+                    return
+                final_status = self._final_status(job)
+                result = library_persistence.finalize_download(
+                    job.job_id,
+                    expected_file_count=len(resolved.urls),
+                    status=final_status,
+                )
+                self._apply_persistence_warning(job, result)
+                final_status = self._final_status(job)
+                if self.transition_job(job, final_status, progress=100, message=job.message or "Download completed"):
                     logger.info(
                         "download.job.completed job_id=%s elapsed_ms=%s",
                         job.job_id,
@@ -360,7 +398,11 @@ class DownloadJobManager:
             return
         job.filename = path.name
         job.files = [{"filename": path.name, "category": resolved.category, "status": "completed"}]
-        library_persistence.persist_file(job.job_id, path, resolved.category)
+        job.succeeded_count = 1
+        job.failed_count = 0
+        self.transition_job(job, "finalizing", progress=99, message="Saving file metadata...")
+        result = library_persistence.persist_file(job.job_id, path, resolved.category)
+        self._apply_persistence_warning(job, result)
         job.message = "Download completed"
         logger.info(
             "download.direct.completed job_id=%s filename=%s bytes=%s",
@@ -404,17 +446,23 @@ class DownloadJobManager:
         ]
         job.files = files
         job.filename = completed[0]["filename"] if len(completed) == 1 else None
+        job.succeeded_count = len(completed)
+        job.failed_count = len(failed)
+        self.transition_job(job, "finalizing", progress=99, message="Saving gallery metadata...")
         for item in completed:
             filename = item.get("filename")
             if filename:
-                library_persistence.persist_file(
+                result = library_persistence.persist_file(
                     job.job_id,
                     resolved.output_dir / str(filename),
                     resolved.category,
                     gallery_index=item.get("index"),
                 )
+                self._apply_persistence_warning(job, result)
         job.message = (
-            "One or more gallery items could not be downloaded."
+            f"{len(completed)} of {total} files downloaded."
+            if failed and completed
+            else "No gallery items could be downloaded."
             if failed
             else "Download completed"
         )
@@ -462,7 +510,11 @@ class DownloadJobManager:
             return
         job.filename = path.name
         job.files = [{"filename": path.name, "category": resolved.category, "status": "completed"}]
-        library_persistence.persist_file(job.job_id, path, resolved.category)
+        job.succeeded_count = 1
+        job.failed_count = 0
+        self.transition_job(job, "finalizing", progress=99, message="Saving file metadata...")
+        result = library_persistence.persist_file(job.job_id, path, resolved.category)
+        self._apply_persistence_warning(job, result)
         job.message = "Download completed"
         logger.info("download.ytdlp.completed job_id=%s filename=%s", job.job_id, path.name)
 
@@ -493,6 +545,10 @@ class DownloadJobManager:
             files=files,
             error=job.error,
             error_code=job.error_code,
+            warnings=job.warnings,
+            succeeded_count=job.succeeded_count,
+            failed_count=job.failed_count,
+            retry_of_id=job.retry_of_id,
             bytes_downloaded=job.bytes_downloaded,
             total_bytes=job.total_bytes,
         )
@@ -516,11 +572,49 @@ class DownloadJobManager:
             files=files,
             error=job.error,
             error_code=job.error_code,
+            warnings=job.warnings,
+            succeeded_count=job.succeeded_count,
+            failed_count=job.failed_count,
+            retry_of_id=job.retry_of_id,
             bytes_downloaded=job.bytes_downloaded,
             total_bytes=job.total_bytes,
             cancellable=job.status not in TERMINAL_STATUSES,
             retryable=job.status in RETRYABLE_STATUSES,
         )
+
+    def _final_status(self, job: DownloadJob) -> str:
+        if job.failed_count and job.succeeded_count:
+            return "completed_with_errors"
+        if job.failed_count and not job.succeeded_count:
+            return "failed"
+        if job.warnings:
+            return "completed_with_errors"
+        return "completed"
+
+    def _apply_persistence_warning(self, job: DownloadJob, result) -> None:
+        if result is None or getattr(result, "success", True):
+            return
+        warning_code = getattr(result, "warning_code", None)
+        safe_message = getattr(result, "safe_message", None)
+        if not warning_code or not safe_message:
+            return
+        with self.lock:
+            if not any(warning.get("code") == warning_code for warning in job.warnings):
+                job.warnings.append({"code": warning_code, "message": safe_message})
+                logger.warning("download.persistence.warning job_id=%s warning_code=%s", job.job_id, warning_code)
+
+    def _should_persist_progress(self, job: DownloadJob) -> bool:
+        now = monotonic()
+        if job.status in TERMINAL_STATUSES:
+            return True
+        if job.progress is None:
+            return now - job._last_progress_persisted_at >= 1
+        previous = job._last_progress_persisted_value
+        if previous is None or abs(job.progress - previous) >= 2 or now - job._last_progress_persisted_at >= 1:
+            job._last_progress_persisted_at = now
+            job._last_progress_persisted_value = job.progress
+            return True
+        return False
 
 
 def _safe_error(error: Exception) -> str:

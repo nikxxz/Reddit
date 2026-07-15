@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,7 +17,7 @@ from backend.database.connection import connect
 from backend.database.repositories import downloads as downloads_repo
 from backend.models.downloads import DownloadRequest
 from backend.services.library.reconciliation import reconcile_library
-from backend.services.library.thumbnails import dummy_thumbnail_response, thumbnail_response
+from backend.services.library.thumbnails import _video_frame_timestamp, dummy_thumbnail_response, thumbnail_response
 
 
 class LibraryPersistenceTests(unittest.TestCase):
@@ -120,7 +121,29 @@ class LibraryPersistenceTests(unittest.TestCase):
             exists_on_disk=False,
         )
         self.assertEqual(dummy_thumbnail_response().media_type, "image/svg+xml")
+        self.assertGreater(len(dummy_thumbnail_response().body), 0)
+        self.assertEqual(ET.fromstring(dummy_thumbnail_response().body).tag.split("}")[-1], "svg")
         self.assertEqual(thumbnail_response(download_id).media_type, "image/svg+xml")
+
+    def test_video_thumbnail_timestamp_uses_duration(self):
+        source = Path(settings.download_dir) / "videos" / "example.mp4"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"video")
+        with patch("backend.services.library.thumbnails.shutil.which", return_value="ffprobe"), patch(
+            "backend.services.library.thumbnails.subprocess.run"
+        ) as run:
+            run.return_value.stdout = "120.0\n"
+            self.assertEqual(_video_frame_timestamp(source), 12.0)
+
+    def test_video_thumbnail_timestamp_short_clip_is_clamped(self):
+        source = Path(settings.download_dir) / "videos" / "short.mp4"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"video")
+        with patch("backend.services.library.thumbnails.shutil.which", return_value="ffprobe"), patch(
+            "backend.services.library.thumbnails.subprocess.run"
+        ) as run:
+            run.return_value.stdout = "0.4\n"
+            self.assertAlmostEqual(_video_frame_timestamp(source), 0.1)
 
     def test_pre_migration_backup_created_for_existing_schema(self):
         database = get_database_path()

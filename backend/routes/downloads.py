@@ -12,7 +12,7 @@ from backend.models.downloads import (
     DownloadStartResponse,
     DownloadStatusResponse,
 )
-from backend.services.downloads.errors import DownloadError
+from backend.services.downloads.errors import DuplicateDownloadError, DownloadError
 from backend.services.downloads.manager import download_job_manager
 from backend.database.repositories import downloads as downloads_repo
 from backend.utils.logging import get_logger
@@ -34,16 +34,18 @@ def list_downloads(
     try:
         active_jobs = download_job_manager.list_jobs(status)
         active_job_ids = {job.job_id for job in active_jobs}
-        historical = [
-            _history_summary(row)
-            for row in downloads_repo.list_downloads(
-                status_filter=status,
-                availability_filter=availability,
-                limit=limit,
-                offset=offset,
-            )
-            if row["job_id"] not in active_job_ids
-        ]
+        historical = []
+        if status != "active":
+            historical = [
+                _history_summary(row)
+                for row in downloads_repo.list_downloads(
+                    status_filter=status,
+                    availability_filter=availability,
+                    limit=limit,
+                    offset=offset,
+                )
+                if row["job_id"] not in active_job_ids
+            ]
         jobs = [*active_jobs, *historical]
         logger.info(
             "download.jobs.list.success status_filter=%s job_count=%s elapsed_ms=%s",
@@ -65,6 +67,15 @@ def list_downloads(
 async def start_download(request: DownloadRequest) -> DownloadStartResponse:
     try:
         job = await download_job_manager.create_job(request)
+    except DuplicateDownloadError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "detail": "This media already exists in your library.",
+                "error_code": exc.error_code,
+                "duplicate": exc.duplicate,
+            },
+        ) from exc
     except DownloadError as exc:
         raise HTTPException(status_code=507, detail=str(exc)) from exc
     return DownloadStartResponse(job_id=job.job_id, status="queued")
@@ -130,7 +141,7 @@ def _history_summary(row) -> object:
         "post_id": row["post_id"],
         "status": row["status"],
         "availability": row["availability"],
-        "progress": 100 if row["status"] == "completed" else None,
+        "progress": 100 if row["status"] in {"completed", "completed_with_errors"} else None,
         "message": row["error_message"] or "",
         "media_type": row["media_type"] or "media",
         "title": row["title"],
@@ -143,6 +154,10 @@ def _history_summary(row) -> object:
         "files": files,
         "error": row["error_message"],
         "error_code": row["error_code"],
+        "warnings": [],
+        "succeeded_count": sum(1 for file in files if file["status"] == "completed"),
+        "failed_count": sum(1 for file in files if file["status"] != "completed"),
+        "retry_of_id": row["retry_of_id"],
         "cancellable": False,
         "retryable": row["status"] in {"failed", "cancelled"} or row["availability"] in {"missing", "partially_available"},
     }

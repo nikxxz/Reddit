@@ -102,10 +102,20 @@ export function DownloadJobCard({
           </Group>
 
           {job.message ? (
-            <Text size="sm" c={job.status === "failed" ? "red.7" : "gray.7"} role={job.status === "failed" ? "alert" : undefined}>
+            <Text size="sm" c={job.status === "failed" ? "red.7" : job.status === "completed_with_errors" ? "yellow.8" : "gray.7"} role={job.status === "failed" ? "alert" : undefined}>
               {job.error || job.message}
               {job.errorCode ? ` (${job.errorCode})` : ""}
             </Text>
+          ) : null}
+
+          {job.warnings?.length ? (
+            <Stack gap={3}>
+              {job.warnings.map((warning) => (
+                <Text key={warning.code} size="sm" c="yellow.8">
+                  {warning.message || "The download completed with a warning."}
+                </Text>
+              ))}
+            </Stack>
           ) : null}
 
           <DownloadJobProgress job={job} />

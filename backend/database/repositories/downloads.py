@@ -72,7 +72,7 @@ def update_download_status(
     timestamp = now()
     fields = ["status = ?", "updated_at = ?"]
     values: list[Any] = [status, timestamp]
-    if status in {"resolving", "downloading", "merging"}:
+    if status in {"resolving", "downloading", "merging", "finalizing"}:
         fields.append("started_at = COALESCE(started_at, ?)")
         values.append(timestamp)
     if status in {"completed", "failed", "cancelled", "completed_with_errors"}:
@@ -232,7 +232,7 @@ def mark_interrupted_jobs() -> int:
                 error_message = 'The download was interrupted when the application stopped.',
                 completed_at = COALESCE(completed_at, ?),
                 updated_at = ?
-            WHERE status IN ('queued', 'resolving', 'downloading', 'merging')
+            WHERE status IN ('queued', 'resolving', 'downloading', 'merging', 'finalizing')
             """,
             (timestamp, timestamp),
         )
@@ -253,7 +253,7 @@ def list_downloads(
         where.append("status = ?")
         values.append(status_filter)
     elif status_filter == "active":
-        where.append("status IN ('queued', 'resolving', 'downloading', 'merging')")
+        where.append("status IN ('queued', 'resolving', 'downloading', 'merging', 'finalizing')")
     if availability_filter:
         mapped = "partially_available" if availability_filter == "partial" else availability_filter
         where.append("availability = ?")
@@ -327,8 +327,8 @@ def delete_download(download_id: str) -> int:
 
 def delete_terminal_records(statuses: set[str] | None = None) -> int:
     _ensure_schema()
-    terminal = statuses or {"completed", "failed", "cancelled"}
-    allowed = sorted(terminal & {"completed", "failed", "cancelled"})
+    terminal = statuses or {"completed", "completed_with_errors", "failed", "cancelled"}
+    allowed = sorted(terminal & {"completed", "completed_with_errors", "failed", "cancelled"})
     if not allowed:
         return 0
     placeholders = ",".join("?" for _ in allowed)

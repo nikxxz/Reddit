@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from backend.main import app
 from backend.models.downloads import DownloadRequest
 from backend.services.downloads.errors import DownloadError
+from backend.services.downloads.errors import DuplicateDownloadError
 from backend.services.downloads.manager import DownloadJob, DownloadJobManager, download_job_manager
 
 
@@ -90,6 +91,20 @@ class DownloadListApiTests(unittest.TestCase):
             self.assertNotIn("done", download_job_manager.jobs)
             self.assertIn("active", download_job_manager.jobs)
 
+    def test_duplicate_start_response_is_structured(self):
+        client = TestClient(app)
+        duplicate = {
+            "type": "exact_download_exists",
+            "existing_download_id": "download-1",
+            "availability": "available",
+        }
+        with patch.object(download_job_manager, "create_job", side_effect=DuplicateDownloadError(duplicate)):
+            response = client.post("/api/downloads", json=request().model_dump())
+        self.assertEqual(response.status_code, 409)
+        detail = response.json()["detail"]
+        self.assertEqual(detail["error_code"], "duplicate_download")
+        self.assertEqual(detail["duplicate"], duplicate)
+
 
 class DownloadManagerVisibilityTests(unittest.IsolatedAsyncioTestCase):
     def test_jobs_ordered_consistently(self):
@@ -135,7 +150,7 @@ class DownloadManagerVisibilityTests(unittest.IsolatedAsyncioTestCase):
             new_job = await manager.retry_job("old")
             for _ in range(30):
                 status = manager.get_status(new_job.job_id)
-                if status.status in {"completed", "failed", "cancelled"}:
+                if status.status in {"completed", "completed_with_errors", "failed", "cancelled"}:
                     break
                 await asyncio.sleep(0.01)
         self.assertNotEqual(new_job.job_id, "old")
@@ -161,7 +176,7 @@ class DownloadManagerVisibilityTests(unittest.IsolatedAsyncioTestCase):
         )
         captured = {}
 
-        async def fake_create_job(download_request):
+        async def fake_create_job(download_request, retry_of_download_id=None):
             captured["request"] = download_request
             return DownloadJob(job_id="new", request=download_request)
 

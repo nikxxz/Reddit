@@ -35,7 +35,6 @@ async function loadAppConfig() {
   try {
     const config = await fetchAppConfig();
     state.appName = config.app_name || state.appName;
-    state.redditUsername = config.reddit_username || "";
   } catch (error) {
     state.redditUsername = "";
   }

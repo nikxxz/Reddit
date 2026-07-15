@@ -5,7 +5,9 @@ const STATUS_COLORS = {
   resolving: "blue",
   downloading: "blue",
   merging: "violet",
+  finalizing: "violet",
   completed: "green",
+  completed_with_errors: "yellow",
   failed: "red",
   cancelled: "gray"
 };
@@ -15,7 +17,9 @@ const STATUS_LABELS = {
   resolving: "Preparing",
   downloading: "Downloading",
   merging: "Merging",
+  finalizing: "Finalizing",
   completed: "Completed",
+  completed_with_errors: "Completed with errors",
   failed: "Failed",
   cancelled: "Cancelled"
 };

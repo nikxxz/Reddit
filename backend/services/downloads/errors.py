@@ -20,6 +20,14 @@ class DownloadError(RuntimeError):
     error_code: str | None = None
 
 
+class DuplicateDownloadError(DownloadError):
+    error_code = "duplicate_download"
+
+    def __init__(self, duplicate: dict[str, object]) -> None:
+        self.duplicate = duplicate
+        super().__init__("This media already exists in your library.")
+
+
 class MediaResolutionError(DownloadError):
     def __init__(
         self,

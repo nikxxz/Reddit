@@ -8,7 +8,6 @@ class HealthResponse(BaseModel):
 
 class AppConfigResponse(BaseModel):
     app_name: str
-    reddit_username: str | None = None
 
 
 class SystemStatusResponse(BaseModel):
@@ -22,7 +21,11 @@ class SystemStatusResponse(BaseModel):
     active_downloads: int
     queued_downloads: int
     database_ready: bool = False
+    database_writable: bool = False
     database_schema_version: int | None = None
+    database_expected_schema_version: int | None = None
+    database_migration_required: bool = False
+    database_last_error_code: str | None = None
     database_backup_available: bool = False
     database_last_backup_at: str | None = None
     library_download_count: int = 0

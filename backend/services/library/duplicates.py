@@ -5,8 +5,6 @@ from backend.database.repositories.downloads import find_duplicate
 
 
 def duplicate_for_request(request: DownloadRequest):
-    if request.force_download:
-        return None
     try:
         return find_duplicate(
             request.post_id,

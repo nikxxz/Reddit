@@ -55,6 +55,10 @@ async function parseJsonSafely(response) {
 }
 
 function getReadableError(data, status) {
+  if (data && data.detail && typeof data.detail === "object") {
+    return data.detail.detail || data.detail.message || `Request failed with status ${status}.`;
+  }
+
   if (data && typeof data.message === "string") {
     return data.message;
   }

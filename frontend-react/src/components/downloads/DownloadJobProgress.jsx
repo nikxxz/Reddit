@@ -9,10 +9,14 @@ export function DownloadJobProgress({ job }) {
     return <Text size="sm">Merging audio and video</Text>;
   }
 
+  if (job.status === "finalizing") {
+    return <Text size="sm">Saving file metadata...</Text>;
+  }
+
   if (job.mediaType === "gallery" && job.files.length > 0) {
     return (
       <Text size="sm">
-        {completedFileCount(job.files)} / {job.files.length} files
+        {completedFileCount(job.files)} of {job.files.length} files downloaded
       </Text>
     );
   }
@@ -28,7 +32,7 @@ export function DownloadJobProgress({ job }) {
     );
   }
 
-  if (["queued", "resolving", "downloading"].includes(job.status)) {
+  if (["queued", "resolving", "downloading", "finalizing"].includes(job.status)) {
     return (
       <Group gap="xs">
         <Loader size="xs" />

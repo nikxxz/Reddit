@@ -12,7 +12,9 @@ DownloadStatus = Literal[
     "resolving",
     "downloading",
     "merging",
+    "finalizing",
     "completed",
+    "completed_with_errors",
     "failed",
     "cancelled",
 ]
@@ -43,6 +45,17 @@ class DownloadStartResponse(BaseModel):
     message: str | None = None
 
 
+class DuplicateDownloadDetail(BaseModel):
+    type: str
+    existing_download_id: str | None = None
+    availability: str | None = None
+
+
+class JobWarning(BaseModel):
+    code: str
+    message: str
+
+
 class DownloadedFile(BaseModel):
     id: str | None = None
     filename: str | None = None
@@ -63,11 +76,23 @@ class DownloadStatusResponse(BaseModel):
     files: list[DownloadedFile] = Field(default_factory=list)
     error: str | None = None
     error_code: str | None = None
+    warnings: list[JobWarning] = Field(default_factory=list)
+    succeeded_count: int | None = None
+    failed_count: int | None = None
+    retry_of_id: str | None = None
     bytes_downloaded: int | None = None
     total_bytes: int | None = None
 
 
-DownloadJobFilter = Literal["all", "active", "queued", "completed", "failed", "cancelled"]
+DownloadJobFilter = Literal[
+    "all",
+    "active",
+    "queued",
+    "completed",
+    "completed_with_errors",
+    "failed",
+    "cancelled",
+]
 
 
 class DownloadJobSummary(BaseModel):
@@ -89,6 +114,10 @@ class DownloadJobSummary(BaseModel):
     files: list[DownloadedFile] = Field(default_factory=list)
     error: str | None = None
     error_code: str | None = None
+    warnings: list[JobWarning] = Field(default_factory=list)
+    succeeded_count: int | None = None
+    failed_count: int | None = None
+    retry_of_id: str | None = None
     bytes_downloaded: int | None = None
     total_bytes: int | None = None
     cancellable: bool = False
@@ -100,8 +129,8 @@ class DownloadJobListResponse(BaseModel):
 
 
 class ClearDownloadsRequest(BaseModel):
-    statuses: list[Literal["completed", "failed", "cancelled"]] = Field(
-        default_factory=lambda: ["completed", "failed", "cancelled"]
+    statuses: list[Literal["completed", "completed_with_errors", "failed", "cancelled"]] = Field(
+        default_factory=lambda: ["completed", "completed_with_errors", "failed", "cancelled"]
     )
 
 

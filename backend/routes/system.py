@@ -13,7 +13,7 @@ from backend.services.system import (
     yt_dlp_available,
 )
 from backend.core.paths import get_thumbnail_root
-from backend.database.migrations import get_schema_version
+from backend.database.health import check_database_health
 from backend.database.repositories.downloads import counts as library_counts
 from backend.services.library.backups import backup_status
 
@@ -25,7 +25,11 @@ router = APIRouter(tags=["system"])
 def system_status() -> SystemStatusResponse:
     active_downloads, queued_downloads = download_job_manager.active_counts()
     database_backup_available, database_last_backup_at = backup_status()
-    library = library_counts()
+    database_health = check_database_health()
+    try:
+        library = library_counts()
+    except Exception:
+        library = {"downloads": 0, "files": 0, "missing_files": 0}
     return SystemStatusResponse(
         status="ok",
         ffmpeg_available=ffmpeg_available(),
@@ -36,8 +40,12 @@ def system_status() -> SystemStatusResponse:
         minimum_free_space_gb=settings.min_free_disk_gb,
         active_downloads=active_downloads,
         queued_downloads=queued_downloads,
-        database_ready=True,
-        database_schema_version=get_schema_version(),
+        database_ready=database_health.ready,
+        database_writable=database_health.writable,
+        database_schema_version=database_health.schema_version,
+        database_expected_schema_version=database_health.expected_schema_version,
+        database_migration_required=database_health.migration_required,
+        database_last_error_code=database_health.last_error_code,
         database_backup_available=database_backup_available,
         database_last_backup_at=database_last_backup_at,
         library_download_count=library["downloads"],

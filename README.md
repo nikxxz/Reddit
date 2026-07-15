@@ -112,7 +112,7 @@ Important settings:
 - `APP_DATA_DIR`, `DATABASE_FILENAME`, `THUMBNAIL_FORMAT`, `THUMBNAIL_MAX_WIDTH`, `THUMBNAIL_MAX_HEIGHT`
 - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, `REDDIT_REDIRECT_URI`, `SESSION_FILE`
 - `SEARCH_LIMIT`, `SEARCH_FETCH_MULTIPLIER`, `SEARCH_SYNTAX`, `MAX_API_RETRIES`
-- `DOWNLOAD_DIR`, `MAX_CONCURRENT_DOWNLOADS`, `MAX_DOWNLOAD_SIZE_MB`
+- `DOWNLOAD_DIR`, `MAX_CONCURRENT_DOWNLOADS`, `MAX_DOWNLOAD_SIZE_MB`, `CHECKSUM_LARGE_FILE_THRESHOLD_MB`
 - `DOWNLOAD_JOB_RETENTION_HOURS`, `FAILED_JOB_RETENTION_HOURS`, `PART_FILE_MAX_AGE_HOURS`, `MIN_FREE_DISK_GB`
 - `DATABASE_BACKUP_RETENTION`, `DATABASE_BACKUP_INTERVAL_HOURS`, `LIBRARY_RECONCILE_ON_STARTUP`, `GENERATE_MISSING_THUMBNAILS_ON_STARTUP`
 
@@ -142,7 +142,7 @@ Gallery item format:
 <subreddit>_<username>_<filename>_01.<extension>
 ```
 
-Gallery downloads may produce multiple files. Duplicate target filenames receive suffixes so existing files are not overwritten. Temporary `.part` files are used while direct downloads stream to disk; stale `.part` files under the configured download root are cleaned up on startup after the configured age threshold.
+Gallery downloads may produce multiple files. Duplicate target filenames receive suffixes so existing files are not overwritten. Exact duplicate media is rejected with a structured `duplicate_download` response unless `force_download=true`; forced downloads create a new job and a new history record without mutating the original. Temporary `.part` files are used while direct downloads stream to disk; stale `.part` files under the configured download root are cleaned up on startup after the configured age threshold.
 
 ## Portable Media Library
 
@@ -161,7 +161,7 @@ For a full portable restore:
 
 Copying only `app-data/` restores the history database, but downloaded files may appear missing until the matching `downloads/` tree is restored. Missing files do not erase history; records keep their completed, failed, or cancelled status and update a separate availability field.
 
-Generated thumbnails live under `app-data/thumbnails/generated/`. The backend prefers generated local thumbnails, then downloaded local media, then a dummy thumbnail. Video thumbnails use FFmpeg when available. Image and GIF thumbnail generation uses Pillow when installed; without it, the app falls back to local files or the dummy thumbnail.
+Generated thumbnails live under `app-data/thumbnails/generated/`. `THUMBNAIL_FORMAT` accepts `webp`, `jpeg`/`jpg`, or `png` and maps explicitly to Pillow encoders. The backend prefers generated local thumbnails, then downloaded local media, then a valid SVG dummy thumbnail. Video thumbnails use FFprobe duration plus FFmpeg when available. Image and GIF thumbnail generation uses Pillow when installed; without it, the app falls back to local files or the dummy thumbnail.
 
 ## Database Backups
 
@@ -179,9 +179,11 @@ Manual restore:
 
 ## Reliability And Diagnostics
 
-Active download jobs are in memory. Historical completed, failed, and cancelled downloads are persisted in SQLite. Cleanup removes only history records, never downloaded media.
+Active download jobs are in memory. Historical completed, completed-with-errors, failed, and cancelled downloads are persisted in SQLite. Cleanup removes only history records, never downloaded media.
 
-Retained jobs are available at `GET /api/downloads`. The response returns safe job summaries ordered by active jobs first, then queued, failed, completed, and cancelled jobs, newest first within each group. Failed and cancelled jobs can be retried with `POST /api/downloads/{job_id}/retry`; the retry creates a new job ID and keeps the old terminal job unchanged. Terminal metadata can be cleared with `DELETE /api/downloads/terminal` without deleting downloaded files.
+Retained jobs are available at `GET /api/downloads`. The response returns safe job summaries ordered by active jobs first, then queued, failed, completed-with-errors, completed, and cancelled jobs, newest first within each group. A visible `finalizing` state is used while file metadata, checksums, thumbnails, and final database updates are saved. Failed and cancelled jobs can be retried with `POST /api/downloads/{job_id}/retry`; the retry creates a new job ID, persists `retry_of_id` to the direct parent history record, and keeps the old terminal job unchanged. Terminal metadata can be cleared with `DELETE /api/downloads/terminal` without deleting downloaded files.
+
+If media transfer succeeds but history or file metadata persistence remains incomplete after a bounded retry, the job exposes a safe warning such as `history_persistence_failed` and uses `completed_with_errors` rather than reporting the transfer as failed. Partial gallery success also uses `completed_with_errors`; all failed gallery items produce `failed`.
 
 Before starting a new download, the backend checks free disk space under the configured download filesystem. If available space is below `MIN_FREE_DISK_GB`, the job is rejected with:
 
@@ -195,7 +197,7 @@ Safe diagnostics are available at:
 GET /api/system/status
 ```
 
-The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, schema version, backup availability, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
+The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, writability, schema version, expected schema version, migration-required state, safe database error code, backup availability, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
 
 The React app currently has no real settings or connections page beyond sidebar/status components, so diagnostics are backend-only for now. A future UI block should live on a real settings or connections page, not on the search page.
 

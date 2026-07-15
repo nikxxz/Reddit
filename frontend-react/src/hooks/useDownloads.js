@@ -15,8 +15,8 @@ import {
   retryDownload
 } from "../api/downloadsApi";
 
-const ACTIVE_STATUSES = new Set(["queued", "resolving", "downloading", "merging"]);
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const ACTIVE_STATUSES = new Set(["queued", "resolving", "downloading", "merging", "finalizing"]);
+const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed", "cancelled"]);
 const POLL_ACTIVE_MS = 1500;
 const POLL_IDLE_MS = 5000;
 
@@ -41,6 +41,10 @@ function normalizeJob(job) {
     files: Array.isArray(job.files) ? job.files : [],
     error: job.error || null,
     errorCode: job.error_code || null,
+    warnings: Array.isArray(job.warnings) ? job.warnings : [],
+    succeededCount: job.succeeded_count ?? null,
+    failedCount: job.failed_count ?? null,
+    retryOfId: job.retry_of_id || null,
     bytesDownloaded: job.bytes_downloaded ?? null,
     totalBytes: job.total_bytes ?? null,
     cancellable: Boolean(job.cancellable),

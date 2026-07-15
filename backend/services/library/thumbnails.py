@@ -19,6 +19,8 @@ DUMMY_SVG = b"""<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 GIF_EXTENSIONS = {".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".webm", ".mkv"}
+PILLOW_FORMATS = {"webp": "WEBP", "jpeg": "JPEG", "png": "PNG"}
+THUMBNAIL_SUFFIXES = {"webp": ".webp", "jpeg": ".jpg", "png": ".png"}
 
 
 def generate_thumbnail_for_download(download_id: str) -> None:
@@ -76,6 +78,7 @@ def thumbnail_response(download_id: str) -> Response:
 
 
 def dummy_thumbnail_response() -> Response:
+    logger.info("thumbnail.dummy.used")
     return Response(content=DUMMY_SVG, media_type="image/svg+xml")
 
 
@@ -106,7 +109,7 @@ def _first_existing_file(files: Iterable[object]):
 
 
 def _thumbnail_path(download_id: str) -> Path:
-    suffix = ".webp" if settings.thumbnail_format == "webp" else ".jpg"
+    suffix = THUMBNAIL_SUFFIXES[settings.thumbnail_format]
     return get_thumbnail_root() / f"{download_id}{suffix}"
 
 
@@ -123,7 +126,7 @@ def _generate_image_thumbnail(download_id: str, source: Path) -> bool:
             image.thumbnail((settings.thumbnail_max_width, settings.thumbnail_max_height))
             if image.mode not in {"RGB", "RGBA"}:
                 image = image.convert("RGB")
-            image.save(target, format=settings.thumbnail_format.upper())
+            image.save(target, format=PILLOW_FORMATS[settings.thumbnail_format], **_thumbnail_save_options())
             width, height = image.size
         downloads_repo.set_thumbnail(
             download_id=download_id,
@@ -145,11 +148,12 @@ def _generate_video_thumbnail(download_id: str, source: Path) -> bool:
         return False
     target = _thumbnail_path(download_id)
     target.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = _video_frame_timestamp(source)
     command = [
         "ffmpeg",
         "-y",
         "-ss",
-        "00:00:01",
+        f"{timestamp:.3f}",
         "-i",
         str(source),
         "-frames:v",
@@ -169,5 +173,43 @@ def _generate_video_thumbnail(download_id: str, source: Path) -> bool:
         )
         return target.exists()
     except Exception:
-        logger.warning("library.thumbnail.video.failed download_id=%s", download_id)
+        logger.warning("thumbnail.video.frame.failed download_id=%s", download_id)
         return False
+
+
+def _thumbnail_save_options() -> dict[str, object]:
+    if settings.thumbnail_format == "webp":
+        return {"quality": 82, "method": 4}
+    if settings.thumbnail_format == "jpeg":
+        return {"quality": 85, "optimize": True}
+    return {"optimize": True}
+
+
+def _video_frame_timestamp(source: Path) -> float:
+    duration = _probe_duration(source)
+    if duration is None:
+        return 1.0
+    if duration <= 0.8:
+        return max(0.05, duration * 0.25)
+    return min(max(1.0, duration * 0.10), max(0.05, duration - 0.1))
+
+
+def _probe_duration(source: Path) -> float | None:
+    if shutil.which("ffprobe") is None:
+        return None
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(source),
+    ]
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=10)
+        return float(result.stdout.strip())
+    except Exception:
+        logger.warning("thumbnail.video.probe.failed")
+        return None

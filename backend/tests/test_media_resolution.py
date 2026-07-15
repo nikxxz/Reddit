@@ -148,7 +148,7 @@ class MediaResolutionTests(unittest.IsolatedAsyncioTestCase):
         )
         captured = {}
 
-        async def fake_create_job(download_request):
+        async def fake_create_job(download_request, retry_of_download_id=None):
             captured["request"] = download_request
             return DownloadJob(job_id="new", request=download_request)
 

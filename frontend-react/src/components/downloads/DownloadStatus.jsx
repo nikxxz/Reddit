@@ -8,9 +8,15 @@ const STATUS_MESSAGES = {
   resolving: "Preparing media...",
   downloading: "Downloading...",
   merging: "Merging audio and video...",
+  finalizing: "Saving file metadata...",
   completed: "Download completed",
+  completed_with_errors: "Download completed with errors",
   failed: "Download failed",
   cancelled: "Download cancelled"
+};
+
+const WARNING_MESSAGES = {
+  history_persistence_failed: "The file downloaded, but its history record could not be saved completely."
 };
 
 const ERROR_MESSAGES = {
@@ -57,11 +63,16 @@ export function DownloadStatus({ state }) {
     );
   }
 
-  if (state.status === "completed") {
+  if (state.status === "completed" || state.status === "completed_with_errors") {
     return (
-      <Alert color="green" icon={<IconCircleCheck size={16} />} variant="light">
+      <Alert color={state.status === "completed_with_errors" ? "yellow" : "green"} icon={<IconCircleCheck size={16} />} variant="light">
         <Stack gap={6}>
-          <Text fw={700}>Download completed</Text>
+          <Text fw={700}>{state.status === "completed_with_errors" ? "Download completed with errors" : "Download completed"}</Text>
+          {state.warnings?.map((warning) => (
+            <Text key={warning.code} size="sm">
+              {WARNING_MESSAGES[warning.code] || warning.message || "The download completed with a warning."}
+            </Text>
+          ))}
           <DownloadResult files={state.files} />
         </Stack>
       </Alert>

@@ -15,5 +15,4 @@ def health() -> HealthResponse:
 def app_config() -> AppConfigResponse:
     return AppConfigResponse(
         app_name=settings.app_name,
-        reddit_username=settings.reddit_username,
     )

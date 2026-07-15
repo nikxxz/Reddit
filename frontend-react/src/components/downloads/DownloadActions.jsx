@@ -2,7 +2,7 @@ import { Button, Group, Stack } from "@mantine/core";
 import { IconDownload, IconPlayerStop } from "@tabler/icons-react";
 import { DownloadStatus } from "./DownloadStatus";
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed", "cancelled"]);
 
 export function DownloadActions({
   item,

@@ -5,14 +5,14 @@ from time import monotonic
 from unittest.mock import patch
 
 from backend.models.downloads import DownloadRequest
-from backend.services.downloads.errors import DownloadError
+from backend.services.downloads.errors import DuplicateDownloadError, DownloadError
 from backend.services.downloads.manager import DownloadJob, DownloadJobManager
 
 
 async def wait_for_terminal(manager, job_id):
     for _ in range(30):
         status = manager.get_status(job_id)
-        if status.status in {"completed", "failed", "cancelled"}:
+        if status.status in {"completed", "completed_with_errors", "failed", "cancelled"}:
             return status
         await asyncio.sleep(0.01)
     raise AssertionError("job did not finish")
@@ -199,6 +199,65 @@ class DownloadJobTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(DownloadError) as context:
                 await manager.create_job(request)
         self.assertEqual(str(context.exception), "Not enough free disk space to start this download.")
+
+    async def test_force_download_bypasses_duplicate_block(self):
+        manager = DownloadJobManager(max_concurrent=1)
+        request = DownloadRequest(post_id="abc123", media_type="image", media_url="https://i.redd.it/example.jpg")
+        duplicate = {"id": "existing", "availability": "available", "status": "completed"}
+
+        def close_task(coro):
+            coro.close()
+            return None
+
+        with patch("backend.services.downloads.manager.duplicate_for_request", return_value=duplicate), patch(
+            "backend.services.downloads.manager.has_minimum_free_space", return_value=True
+        ), patch("backend.services.downloads.manager.asyncio.create_task", side_effect=close_task):
+            with self.assertRaises(DuplicateDownloadError) as context:
+                await manager.create_job(request)
+            forced = await manager.create_job(request.model_copy(update={"force_download": True}))
+
+        self.assertEqual(context.exception.duplicate["existing_download_id"], "existing")
+        self.assertIn(forced.job_id, manager.jobs)
+        self.assertNotEqual(forced.job_id, "existing")
+
+    async def test_retry_persists_direct_parent_lineage(self):
+        manager = DownloadJobManager(max_concurrent=1)
+        request = DownloadRequest(post_id="abc123", media_type="image", media_url="https://i.redd.it/example.jpg")
+        parent = DownloadJob(job_id="old", request=request, status="failed", library_download_id="download-a")
+        manager.jobs[parent.job_id] = parent
+        captured = {}
+
+        async def fake_create_job(download_request, retry_of_download_id=None):
+            captured["retry_of_download_id"] = retry_of_download_id
+            return DownloadJob(job_id="new", request=download_request, retry_of_id=retry_of_download_id)
+
+        with patch.object(manager, "create_job", side_effect=fake_create_job):
+            new_job = await manager.retry_job("old")
+
+        self.assertEqual(captured["retry_of_download_id"], "download-a")
+        self.assertEqual(new_job.retry_of_id, "download-a")
+        self.assertEqual(manager.jobs["old"].status, "failed")
+
+    async def test_completed_with_errors_is_terminal(self):
+        manager = DownloadJobManager(max_concurrent=1)
+        job = DownloadJob(
+            job_id="partial",
+            request=DownloadRequest(post_id="abc123", media_type="gallery"),
+            status="completed_with_errors",
+        )
+        self.assertFalse(manager.transition_job(job, "downloading"))
+        self.assertEqual(job.status, "completed_with_errors")
+
+    async def test_finalizing_is_non_terminal(self):
+        manager = DownloadJobManager(max_concurrent=1)
+        job = DownloadJob(
+            job_id="finalizing",
+            request=DownloadRequest(post_id="abc123", media_type="image"),
+            status="downloading",
+        )
+        self.assertTrue(manager.transition_job(job, "finalizing", message="Saving file metadata..."))
+        self.assertEqual(job.status, "finalizing")
+        self.assertNotIn(job.status, {"completed", "completed_with_errors", "failed", "cancelled"})
 
 
 if __name__ == "__main__":

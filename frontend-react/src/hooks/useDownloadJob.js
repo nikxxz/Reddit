@@ -17,7 +17,7 @@ const INITIAL_STATE = {
   totalBytes: null
 };
 
-const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed", "cancelled"]);
 
 function normalizeStatus(data) {
   return {
@@ -28,6 +28,10 @@ function normalizeStatus(data) {
     files: Array.isArray(data.files) ? data.files : [],
     error: data.error || null,
     errorCode: data.error_code || null,
+    warnings: Array.isArray(data.warnings) ? data.warnings : [],
+    succeededCount: data.succeeded_count ?? null,
+    failedCount: data.failed_count ?? null,
+    retryOfId: data.retry_of_id || null,
     bytesDownloaded: data.bytes_downloaded ?? null,
     totalBytes: data.total_bytes ?? null
   };
