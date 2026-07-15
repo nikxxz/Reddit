@@ -1,0 +1,25 @@
+.reddit-account-section {
+  min-width: 0;
+}
+
+.reddit-account-section-collapsed {
+  display: flex;
+  justify-content: center;
+}
+
+.reddit-account-status-text,
+.reddit-account-username {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reddit-account-error {
+  padding: 8px;
+}
+
+.reddit-account-error .mantine-Alert-body {
+  min-width: 0;
+}

@@ -5,7 +5,12 @@ import { SearchPage } from "../../pages/SearchPage";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
-export function AppLayout({ connections, isChecking, onRetryConnections }) {
+export function AppLayout({
+  connections,
+  isChecking,
+  onRetryConnections,
+  redditAuth
+}) {
   const isMobile = useMediaQuery("(max-width: 48em)");
   const [mobileOpened, { toggle: toggleMobile, close: closeMobile }] =
     useDisclosure(false);
@@ -33,11 +38,11 @@ export function AppLayout({ connections, isChecking, onRetryConnections }) {
     <AppShell
       header={{ height: 56 }}
       navbar={{
-        width: 240,
+        width: isMobile || desktopOpened ? 240 : 64,
         breakpoint: "sm",
         collapsed: {
           mobile: !mobileOpened,
-          desktop: !desktopOpened
+          desktop: false
         }
       }}
       padding="md"
@@ -52,8 +57,10 @@ export function AppLayout({ connections, isChecking, onRetryConnections }) {
       <AppShell.Navbar>
         <AppSidebar
           activeSection={activeSection}
+          collapsed={!isMobile && !desktopOpened}
           connections={connections}
           onSelectSection={handleSelectSection}
+          redditAuth={redditAuth}
         />
       </AppShell.Navbar>
 

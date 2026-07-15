@@ -21,6 +21,24 @@
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 
+.sidebar-navlink-collapsed {
+  width: 40px;
+  min-width: 40px;
+  padding-inline: 10px;
+}
+
+.sidebar-navlink-collapsed .mantine-NavLink-section {
+  margin-inline-end: 0;
+}
+
+.connection-summary-collapsed-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
 @keyframes status-pulse {
   0%,
   100% {

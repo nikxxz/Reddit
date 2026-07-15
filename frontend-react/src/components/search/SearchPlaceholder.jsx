@@ -17,7 +17,7 @@ const SORT_LABELS = {
 
 const TIME_LABELS = {
   all: "All time",
-  today: "Today",
+  day: "Today",
   week: "This week",
   month: "This month",
   year: "This year"
@@ -49,7 +49,7 @@ function getFilterSummary(values) {
     SORT_LABELS[values.sortBy],
     TIME_LABELS[values.timeFilter],
     values.includeNsfw ? "NSFW on" : "NSFW off"
-  ].join(" · ");
+  ].join(" - ");
 }
 
 export function SearchPlaceholder({ submittedValues }) {

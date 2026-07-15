@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getBackendHealth } from "./api/healthApi";
 import { getRedditConnectionStatus } from "./api/redditApi";
 import { AppLayout } from "./components/layout/AppLayout";
+import { useRedditAuth } from "./hooks/useRedditAuth";
 import "./styles/app.css";
+import "./styles/account.css";
 
 const CHECKING_STATE = {
   backend: {
@@ -18,6 +20,7 @@ const CHECKING_STATE = {
 export default function App() {
   const [connections, setConnections] = useState(CHECKING_STATE);
   const controllerRef = useRef(null);
+  const redditAuth = useRedditAuth();
 
   const checkConnections = useCallback(() => {
     controllerRef.current?.abort();
@@ -75,6 +78,7 @@ export default function App() {
       connections={connections}
       isChecking={isChecking}
       onRetryConnections={handleRetry}
+      redditAuth={redditAuth}
     />
   );
 }

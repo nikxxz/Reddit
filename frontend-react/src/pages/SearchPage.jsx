@@ -1,13 +1,44 @@
 import { Divider, Paper, Stack, Text, Title } from "@mantine/core";
+import { useEffect, useRef } from "react";
 import { SearchFilters } from "../components/search/SearchFilters";
 import { SearchForm } from "../components/search/SearchForm";
-import { SearchPlaceholder } from "../components/search/SearchPlaceholder";
+import { SearchResults } from "../components/search/SearchResults";
 import { useSearchForm } from "../hooks/useSearchForm";
+import { useRedditSearch } from "../hooks/useRedditSearch";
 import "../styles/search.css";
+import "../styles/search-results.css";
 
 export function SearchPage() {
-  const { values, submittedValues, setFieldValue, submitSearch } =
-    useSearchForm();
+  const {
+    values,
+    submittedValues,
+    submitRevision,
+    setFieldValue,
+    submitSearch,
+    clearFilters
+  } = useSearchForm();
+  const { state, runSearch, retrySearch, loadMore } = useRedditSearch();
+  const lastSubmitRevisionRef = useRef(submitRevision);
+
+  useEffect(() => {
+    if (!submittedValues) {
+      return undefined;
+    }
+
+    if (submitRevision !== lastSubmitRevisionRef.current) {
+      lastSubmitRevisionRef.current = submitRevision;
+      runSearch(submittedValues);
+      return undefined;
+    }
+
+    const debounceId = window.setTimeout(() => {
+      runSearch(submittedValues);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(debounceId);
+    };
+  }, [submittedValues, submitRevision, runSearch]);
 
   return (
     <Stack className="search-page" gap="md">
@@ -42,7 +73,12 @@ export function SearchPage() {
         </Stack>
       </Paper>
 
-      <SearchPlaceholder submittedValues={submittedValues} />
+      <SearchResults
+        state={state}
+        onRetry={retrySearch}
+        onLoadMore={loadMore}
+        onClearFilters={clearFilters}
+      />
     </Stack>
   );
 }

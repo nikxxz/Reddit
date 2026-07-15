@@ -13,6 +13,7 @@ const INITIAL_VALUES = {
 export function useSearchForm() {
   const [values, setValues] = useState(INITIAL_VALUES);
   const [submittedValues, setSubmittedValues] = useState(null);
+  const [submitRevision, setSubmitRevision] = useState(0);
 
   const setFieldValue = (field, value) => {
     setValues((current) => ({
@@ -47,6 +48,17 @@ export function useSearchForm() {
 
     setValues(nextSubmittedValues);
     setSubmittedValues(nextSubmittedValues);
+    setSubmitRevision((current) => current + 1);
+  };
+
+  const clearFilters = () => {
+    setValues((current) => ({
+      ...current,
+      mediaType: "all",
+      sortBy: "relevance",
+      timeFilter: "all",
+      includeNsfw: false
+    }));
   };
 
   const summaryValues = useMemo(
@@ -63,7 +75,9 @@ export function useSearchForm() {
   return {
     values,
     submittedValues: summaryValues,
+    submitRevision,
     setFieldValue,
-    submitSearch
+    submitSearch,
+    clearFilters
   };
 }

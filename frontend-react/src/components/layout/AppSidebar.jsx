@@ -1,10 +1,10 @@
 import {
   Box,
   Divider,
-  Group,
   NavLink,
   Stack,
   Text,
+  Tooltip,
   Title
 } from "@mantine/core";
 import {
@@ -13,6 +13,7 @@ import {
   IconSearch,
   IconSettings
 } from "@tabler/icons-react";
+import { RedditAccountSection } from "../account/RedditAccountSection";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 const NAV_ITEMS = [
@@ -22,28 +23,49 @@ const NAV_ITEMS = [
   { value: "settings", label: "Settings", icon: IconSettings }
 ];
 
-export function AppSidebar({ activeSection, connections, onSelectSection }) {
+export function AppSidebar({
+  activeSection,
+  collapsed = false,
+  connections,
+  onSelectSection,
+  redditAuth
+}) {
   return (
-    <Stack h="100%" gap="md" p="md">
-      <Box>
-        <Title order={2} size="h4" lh={1.15}>
-          Reddit Media Downloader
-        </Title>
-        <Text size="xs" c="gray.6" mt={4}>
-          Personal media browser
-        </Text>
-      </Box>
+    <Stack h="100%" gap="md" p={collapsed ? "sm" : "md"}>
+      {collapsed ? null : (
+        <Box>
+          <Title order={2} size="h4" lh={1.15}>
+            Reddit Media Downloader
+          </Title>
+          <Text size="xs" c="gray.6" mt={4}>
+            Personal media browser
+          </Text>
+        </Box>
+      )}
 
-      <Stack gap={4} component="nav" aria-label="Primary navigation">
+      <Stack
+        gap={4}
+        component="nav"
+        aria-label="Primary navigation"
+        align={collapsed ? "center" : "stretch"}
+      >
         {NAV_ITEMS.map((item) => (
-          <NavLink
+          <Tooltip
             key={item.value}
-            active={activeSection === item.value}
+            disabled={!collapsed}
             label={item.label}
-            leftSection={<item.icon size={18} stroke={1.8} />}
-            onClick={() => onSelectSection(item.value)}
-            variant="light"
-          />
+            position="right"
+          >
+            <NavLink
+              active={activeSection === item.value}
+              aria-label={item.label}
+              className={collapsed ? "sidebar-navlink-collapsed" : undefined}
+              label={collapsed ? undefined : item.label}
+              leftSection={<item.icon size={18} stroke={1.8} />}
+              onClick={() => onSelectSection(item.value)}
+              variant="light"
+            />
+          </Tooltip>
         ))}
       </Stack>
 
@@ -53,24 +75,26 @@ export function AppSidebar({ activeSection, connections, onSelectSection }) {
         <Divider />
 
         <Stack gap="xs">
-          <Text size="xs" fw={700} c="gray.6" tt="uppercase">
-            Connections
-          </Text>
-          <ConnectionSummary connections={connections} />
+          {collapsed ? null : (
+            <Text size="xs" fw={700} c="gray.6" tt="uppercase">
+              Connections
+            </Text>
+          )}
+          <ConnectionSummary collapsed={collapsed} connections={connections} />
         </Stack>
 
         <Divider />
 
-        <Stack gap={6}>
-          <Text size="xs" fw={700} c="gray.6" tt="uppercase">
-            Account
-          </Text>
-          <Group gap="xs">
-            <Text size="sm" c="gray.7">
-              Not connected
-            </Text>
-          </Group>
-        </Stack>
+        <RedditAccountSection
+          collapsed={collapsed}
+          status={redditAuth.state.status}
+          connected={redditAuth.state.connected}
+          username={redditAuth.state.username}
+          error={redditAuth.state.error}
+          onConnect={redditAuth.connect}
+          onDisconnect={redditAuth.disconnect}
+          onRetry={redditAuth.retry}
+        />
       </Stack>
     </Stack>
   );
