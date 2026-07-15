@@ -14,11 +14,17 @@ export const state = {
   nextAfter: null,
   loading: false,
   error: "",
+  emptyMessage: "",
   hasSearched: false,
   connections: {
     backend: "Checking",
     reddit: "Checking",
     redditReadOnly: null,
+  },
+  redditAuth: {
+    connected: false,
+    connecting: false,
+    username: "",
   },
 };
 

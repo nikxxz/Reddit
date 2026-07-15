@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from backend.utils.urls import (
     is_direct_gif,
@@ -30,6 +31,29 @@ def get_value(source: Any, name: str, default: Any = None) -> Any:
 
 def get_loaded_value(obj: Any, key: str, default: Any = None) -> Any:
     return get_value(obj, key, default)
+
+
+def normalize_subreddit_input(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    parsed = urlparse(cleaned)
+    if parsed.scheme in {"http", "https"} and parsed.netloc.lower() in {
+        "reddit.com",
+        "www.reddit.com",
+        "old.reddit.com",
+        "new.reddit.com",
+    }:
+        cleaned = parsed.path
+    cleaned = cleaned.strip().strip("/")
+    if cleaned.lower().startswith("r/"):
+        cleaned = cleaned[2:]
+    cleaned = cleaned.strip().strip("/")
+    if not cleaned or "/" in cleaned or not SUBREDDIT_NAME_RE.fullmatch(cleaned):
+        raise ValueError("Invalid subreddit name.")
+    return cleaned
 
 
 def reddit_video(submission: Any) -> Any:

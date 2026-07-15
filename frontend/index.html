@@ -59,6 +59,16 @@
               <span class="status-text">Checking</span>
             </span>
           </div>
+          <div class="account-panel" id="reddit-account-panel" title="Reddit account not connected">
+            <span class="account-title">Reddit Account</span>
+            <div class="account-state">
+              <span class="status-dot failed" id="reddit-account-dot" aria-hidden="true"></span>
+              <span class="account-icon" aria-hidden="true">R</span>
+              <span class="account-status" id="reddit-account-status">Disconnected</span>
+            </div>
+            <span class="account-username" id="reddit-account-username"></span>
+            <button class="account-button" type="button" id="reddit-auth-button">Connect Reddit</button>
+          </div>
         </section>
 
         <button
@@ -167,7 +177,7 @@
 
             <div class="empty-state" id="empty-state" hidden>
               <h2>No matching media found</h2>
-              <p>Try choosing another media type filter.</p>
+              <p id="empty-message">Try choosing another media type filter.</p>
             </div>
 
             <div class="error-state" id="error-state" hidden>

@@ -37,4 +37,5 @@ class RedditSearchResponse(BaseModel):
     time_filter: str
     count: int
     next_after: str | None = None
+    message: str | None = None
     items: list[RedditMediaItem]

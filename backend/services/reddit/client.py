@@ -3,6 +3,7 @@ from __future__ import annotations
 import praw
 
 from backend.config import settings, validate_reddit_settings_values
+from backend.services.reddit.oauth import reddit_oauth_manager
 
 
 class RedditClientProvider:
@@ -18,6 +19,9 @@ class RedditClientProvider:
         self._client: praw.Reddit | None = None
 
     def get_client(self) -> praw.Reddit:
+        authenticated = reddit_oauth_manager.get_authenticated_client()
+        if authenticated is not None:
+            return authenticated
         if self._client is None:
             validate_reddit_settings_values(
                 self.client_id,
@@ -42,6 +46,9 @@ class RedditClientProvider:
                 pass
             self._client = reddit
         return self._client
+
+    def client_context(self) -> tuple[str, str | None]:
+        return reddit_oauth_manager.client_context()
 
     def sanitize_error(self, error: Exception) -> str:
         message = str(error).strip() or error.__class__.__name__

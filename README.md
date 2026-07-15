@@ -10,7 +10,7 @@ backend/
   models/              Pydantic models split by common and Reddit-specific domains
   routes/              Thin HTTP route handlers
   services/downloads/  Direct download, yt-dlp, filename, resolver, and safety helpers
-  services/reddit/     Reddit client, connection checks, search, detection, normalization
+  services/reddit/     Reddit clients, OAuth/session, connection checks, search, detection, normalization
   tests/               Backend unit tests and mocked Reddit submission fixtures
   utils/               Shared HTML, URL, and logging helpers
 frontend/
@@ -34,7 +34,10 @@ Do not add FFmpeg orchestration or download queue behavior outside those future 
 - `backend/main.py`: creates the FastAPI app, registers routers, and mounts static frontend assets.
 - `backend/config.py`: reads environment configuration and validates required Reddit values.
 - `backend/routes/reddit.py`: validates HTTP parameters, calls Reddit services, and translates known domain errors into safe HTTP responses.
-- `backend/services/reddit/client.py`: creates and reuses the read-only PRAW client.
+- `backend/routes/auth.py`: handles Reddit OAuth login, callback, status, and logout.
+- `backend/services/reddit/client.py`: creates and reuses the anonymous PRAW client, or returns the authenticated user client when connected.
+- `backend/services/reddit/oauth.py`: creates OAuth URLs, exchanges callback codes, restores sessions, and logs out.
+- `backend/services/reddit/session.py`: persists the refresh token and username locally.
 - `backend/services/reddit/connection.py`: checks Reddit connectivity without exposing credentials.
 - `backend/services/reddit/search.py`: executes Reddit searches, paginates where possible, filters normalized media, and returns response models.
 - `backend/services/reddit/media_detector.py`: contains media-type constants and detection rules.
@@ -80,6 +83,7 @@ APP_HOST=127.0.0.1
 APP_PORT=8000
 APP_NAME=Reddit Media Downloader
 DOWNLOAD_DIR=downloads
+SESSION_FILE=backend/data/session.json
 DEBUG=true
 REDDIT_CONNECT_TIMEOUT=10
 REDDIT_READ_TIMEOUT=20
@@ -96,9 +100,16 @@ REDDIT_USERNAME=your_username
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=windows:your-app-name:v0.1.0 (by /u/your_username)
+REDDIT_REDIRECT_URI=http://127.0.0.1:8000/api/reddit/auth/callback
 ```
 
 Keep `.env` private. It is ignored by git and should not be committed or shared.
+
+Configure the same redirect URI in your Reddit app settings:
+
+```text
+http://127.0.0.1:8000/api/reddit/auth/callback
+```
 
 ## Run
 
@@ -113,6 +124,19 @@ Open:
 - Public app config: http://127.0.0.1:8000/api/app-config
 - Reddit connection test: http://127.0.0.1:8000/api/reddit/test
 - Reddit search: http://127.0.0.1:8000/api/reddit/search?q=mountain&limit=3
+
+## Reddit Account OAuth
+
+The app can run anonymously with the configured Reddit app credentials, or with an optional connected Reddit user session.
+
+- Click `Connect Reddit` in the sidebar.
+- Reddit opens in a popup and asks for `identity` and `read` scopes only.
+- After approval, Reddit redirects to `/api/reddit/auth/callback`.
+- The backend stores only the refresh token and username in `backend/data/session.json`.
+- Access tokens are not persisted; PRAW regenerates them from the refresh token.
+- Click `Disconnect` to delete the local session and return to anonymous mode.
+
+The session file is ignored by git. On startup, the backend attempts to restore the saved refresh token; if it is invalid, the file is deleted and the app falls back to anonymous search.
 
 ## Reddit Search API
 

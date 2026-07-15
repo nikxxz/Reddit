@@ -89,11 +89,13 @@ function handleNsfwChange(elements) {
 function handleSearchSubmit(event, elements) {
   event.preventDefault();
   const query = elements.searchInput.value.trim();
-  if (!query) {
+  const subreddit = normalizeSubreddit(elements.subredditInput.value);
+  if (!query && !subreddit) {
     state.searchQuery = "";
-    state.subreddit = normalizeSubreddit(elements.subredditInput.value);
+    state.subreddit = "";
     state.hasSearched = false;
     state.error = "";
+    state.emptyMessage = "";
     state.items = [];
     state.nextAfter = null;
     clearSelection();
@@ -102,14 +104,14 @@ function handleSearchSubmit(event, elements) {
   }
 
   state.searchQuery = query;
-  state.subreddit = normalizeSubreddit(elements.subredditInput.value);
+  state.subreddit = subreddit;
   elements.subredditInput.value = state.subreddit;
   runSearch(elements, { append: false });
 }
 
 
 async function runSearch(elements, { append = false } = {}) {
-  if (!state.searchQuery) {
+  if (!state.searchQuery && !state.subreddit) {
     return;
   }
   if (state.activeSearchController) {
@@ -120,6 +122,7 @@ async function runSearch(elements, { append = false } = {}) {
 
   state.loading = true;
   state.error = "";
+  state.emptyMessage = "";
   state.hasSearched = true;
   if (!append) {
     state.items = [];
@@ -145,6 +148,7 @@ async function runSearch(elements, { append = false } = {}) {
     const uniqueItems = uniqueById(state.items, incoming);
     state.items = append ? state.items.concat(uniqueItems) : uniqueItems;
     state.nextAfter = data.next_after || null;
+    state.emptyMessage = data.message || "";
   } catch (error) {
     if (error.name === "AbortError") {
       state.error = "Reddit search timed out. Please try again.";

@@ -12,8 +12,16 @@ from backend.api.errors import InvalidSubredditError, RedditSearchError
 from backend.config import settings
 from backend.models.reddit import RedditMediaItem, RedditSearchResponse
 from backend.services.reddit.client import RedditClientProvider
-from backend.services.reddit.media_detector import get_value
+from backend.services.reddit.media_detector import get_value, normalize_subreddit_input
 from backend.services.reddit.normalizer import normalize_submission
+from backend.utils.urls import (
+    is_direct_gif,
+    is_direct_image,
+    is_direct_video,
+    is_gifv,
+    is_known_external_media_url,
+    is_reddit_video_url,
+)
 from backend.utils.logging import get_logger
 
 
@@ -24,6 +32,9 @@ logger = get_logger(__name__)
 class SearchCollectionStats:
     inspected: int = 0
     accepted: int = 0
+    media_detected: int = 0
+    skipped_text_only: int = 0
+    skipped_missing_loaded_metadata: int = 0
     skipped_unsupported: int = 0
     skipped_missing_id: int = 0
     skipped_duplicate: int = 0
@@ -47,15 +58,18 @@ class RedditSearchService:
         include_nsfw: bool = False,
     ) -> RedditSearchResponse:
         query = query.strip()
-        subreddit = subreddit.strip() if subreddit else None
-        if subreddit and subreddit.startswith("r/"):
-            subreddit = subreddit[2:]
+        try:
+            subreddit = normalize_subreddit_input(subreddit)
+        except ValueError:
+            raise InvalidSubredditError("Invalid subreddit") from None
 
         started_at = perf_counter()
-        inspect_limit = min(max(limit * settings.search_fetch_multiplier, 60), 100)
+        inspect_limit = min(limit * settings.search_fetch_multiplier, 100)
+        client_type, username = self.client_provider.client_context()
         logger.info(
             "reddit.search.start query=%r subreddit=%s media_type=%s sort=%s "
-            "time_filter=%s limit=%s inspect_limit=%s after=%s include_nsfw=%s",
+            "time_filter=%s limit=%s inspect_limit=%s after=%s include_nsfw=%s "
+            "client_type=%s username=%s",
             query,
             subreddit or "all",
             media_type,
@@ -65,6 +79,8 @@ class RedditSearchService:
             inspect_limit,
             bool(after),
             include_nsfw,
+            client_type,
+            username,
         )
 
         try:
@@ -75,28 +91,36 @@ class RedditSearchService:
                 time_filter=time_filter,
                 limit=limit,
                 after=after,
+                syntax=settings.search_syntax,
             )
             items, next_after, stats = self._collect_media_items(
                 listing, media_type, limit, include_nsfw
             )
             elapsed_ms = round((perf_counter() - started_at) * 1000)
             logger.info(
-                "reddit.search.success query=%r subreddit=%s inspected=%s accepted=%s "
+                "reddit.search.success query=%r subreddit=%s raw_submissions_received=%s "
+                "media_detected=%s skipped_text_only=%s skipped_missing_loaded_metadata=%s "
                 "skipped_unsupported=%s skipped_missing_id=%s skipped_duplicate=%s "
-                "skipped_media_filter=%s skipped_nsfw=%s detail_hydration_requests=%s "
-                "next_after=%s elapsed_ms=%s",
+                "skipped_media_filter=%s skipped_nsfw=%s returned_items=%s "
+                "detail_hydration_requests=%s next_after=%s elapsed_ms=%s "
+                "client_type=%s username=%s",
                 query,
                 subreddit or "all",
                 stats.inspected,
-                stats.accepted,
+                stats.media_detected,
+                stats.skipped_text_only,
+                stats.skipped_missing_loaded_metadata,
                 stats.skipped_unsupported,
                 stats.skipped_missing_id,
                 stats.skipped_duplicate,
                 stats.skipped_media_filter,
                 stats.skipped_nsfw,
+                stats.accepted,
                 0,
                 bool(next_after),
                 elapsed_ms,
+                client_type,
+                username,
             )
             return RedditSearchResponse(
                 query=query,
@@ -106,6 +130,7 @@ class RedditSearchService:
                 time_filter=time_filter,
                 count=len(items),
                 next_after=next_after,
+                message=self._result_message(stats),
                 items=items,
             )
         except (
@@ -150,30 +175,50 @@ class RedditSearchService:
         time_filter: str,
         limit: int,
         after: str | None,
+        syntax: str | None = None,
     ) -> Any:
-        inspect_limit = min(max(limit * settings.search_fetch_multiplier, 60), 100)
+        inspect_limit = min(limit * settings.search_fetch_multiplier, 100)
+        search_syntax = syntax or settings.search_syntax
         reddit = self.client_provider.get_client()
-        target = reddit.subreddit(subreddit or "all")
-        search_kwargs: dict[str, Any] = {
-            "sort": sort,
-            "time_filter": time_filter,
-            "limit": inspect_limit,
-        }
+        client_type, username = self.client_provider.client_context()
+        target_name = subreddit if subreddit else "all"
+        target = reddit.subreddit(target_name)
+        scope = "subreddit" if subreddit else "all"
         if after:
-            search_kwargs["params"] = {"after": after}
+            params = {"after": after}
+        else:
+            params = None
         logger.info(
-            "reddit.search.praw_request subreddit=%s sort=%s time_filter=%s "
-            "inspect_limit=%s after=%s",
-            subreddit or "all",
+            "reddit.search.praw_request query=%r scope=%s subreddit=%s sort=%s "
+            "time_filter=%s syntax=%s fetch_limit=%s after=%s client_type=%s username=%s",
+            query,
+            scope,
+            target_name,
             sort,
             time_filter,
+            search_syntax,
             inspect_limit,
             bool(after),
+            client_type,
+            username,
         )
+        if query:
+            search_kwargs: dict[str, Any] = {
+                "sort": sort,
+                "time_filter": time_filter,
+                "syntax": search_syntax,
+                "limit": inspect_limit,
+            }
+            if params:
+                search_kwargs["params"] = params
+            search_callable = lambda: target.search(query, **search_kwargs)
+        else:
+            search_callable = lambda: self._browse_listing(target, sort, time_filter, inspect_limit, params)
+
         last_error: Exception | None = None
         for attempt in range(settings.max_api_retries + 1):
             try:
-                return target.search(query, **search_kwargs)
+                return search_callable()
             except Exception as exc:
                 if not self._is_retryable_error(exc) or attempt >= settings.max_api_retries:
                     raise
@@ -188,7 +233,24 @@ class RedditSearchService:
                 sleep(delay)
         if last_error:
             raise last_error
-        return target.search(query, **search_kwargs)
+        return search_callable()
+
+    def _browse_listing(
+        self,
+        target: Any,
+        sort: str,
+        time_filter: str,
+        limit: int,
+        params: dict[str, str] | None,
+    ) -> Any:
+        kwargs: dict[str, Any] = {"limit": limit}
+        if params:
+            kwargs["params"] = params
+        if sort == "new":
+            return target.new(**kwargs)
+        if sort == "top":
+            return target.top(time_filter=time_filter, **kwargs)
+        return target.hot(**kwargs)
 
     def _collect_media_items(
         self,
@@ -212,8 +274,15 @@ class RedditSearchService:
                 )
                 item = normalize_submission(submission)
                 if not item:
-                    stats.skipped_unsupported += 1
+                    reason = self._skip_reason(submission)
+                    if reason == "text_only":
+                        stats.skipped_text_only += 1
+                    elif reason == "missing_loaded_metadata":
+                        stats.skipped_missing_loaded_metadata += 1
+                    else:
+                        stats.skipped_unsupported += 1
                     continue
+                stats.media_detected += 1
                 if item.is_nsfw and not include_nsfw:
                     stats.skipped_nsfw += 1
                     continue
@@ -234,10 +303,14 @@ class RedditSearchService:
         except Exception as exc:
             logger.warning(
                 "reddit.search.collect_failure inspected=%s accepted=%s "
+                "media_detected=%s skipped_text_only=%s skipped_missing_loaded_metadata=%s "
                 "skipped_unsupported=%s skipped_missing_id=%s skipped_duplicate=%s "
                 "skipped_media_filter=%s skipped_nsfw=%s error_type=%s error=%s",
                 stats.inspected,
                 stats.accepted,
+                stats.media_detected,
+                stats.skipped_text_only,
+                stats.skipped_missing_loaded_metadata,
                 stats.skipped_unsupported,
                 stats.skipped_missing_id,
                 stats.skipped_duplicate,
@@ -252,6 +325,84 @@ class RedditSearchService:
         if len(items) >= limit:
             next_after = get_value(listing, "params", {}).get("after") or last_fullname
         return items, next_after, stats
+
+    def debug_raw_search(
+        self,
+        query: str,
+        subreddit: str | None = None,
+        sort: str = "relevance",
+        time_filter: str = "all",
+        limit: int = 10,
+        syntax: str | None = None,
+    ) -> dict[str, Any]:
+        query = query.strip()
+        try:
+            clean_subreddit = normalize_subreddit_input(subreddit)
+        except ValueError:
+            raise InvalidSubredditError("Invalid subreddit") from None
+        listing = self._search_listing(
+            query=query,
+            subreddit=clean_subreddit,
+            sort=sort,
+            time_filter=time_filter,
+            limit=limit,
+            after=None,
+            syntax=syntax or settings.search_syntax,
+        )
+        posts = []
+        for index, submission in enumerate(listing):
+            if index >= limit:
+                break
+            data = vars(submission)
+            posts.append(
+                {
+                    "id": data.get("id"),
+                    "title": data.get("title"),
+                    "subreddit": str(get_value(data.get("subreddit"), "display_name", data.get("subreddit"))),
+                    "url": data.get("url"),
+                    "is_video": data.get("is_video"),
+                    "is_gallery": data.get("is_gallery"),
+                    "over_18": data.get("over_18"),
+                    "loaded_keys": sorted(str(key) for key in data.keys()),
+                }
+            )
+        return {
+            "target_subreddit": clean_subreddit or "all",
+            "query": query,
+            "raw_count": len(posts),
+            "posts": posts,
+        }
+
+    def _skip_reason(self, submission: Any) -> str:
+        data = vars(submission)
+        if data.get("is_poll") or data.get("poll_data"):
+            return "unsupported"
+        url = get_value(submission, "url")
+        if (
+            is_direct_image(url)
+            or is_direct_gif(url)
+            or is_gifv(url)
+            or is_direct_video(url)
+            or is_reddit_video_url(url)
+            or is_known_external_media_url(url)
+        ):
+            return "missing_loaded_metadata"
+        if data.get("is_video") or data.get("is_gallery"):
+            return "missing_loaded_metadata"
+        if url and "reddit.com/r/" in str(url) and "/comments/" in str(url):
+            return "text_only"
+        return "unsupported"
+
+    def _result_message(self, stats: SearchCollectionStats) -> str | None:
+        if stats.accepted:
+            return None
+        if stats.inspected == 0:
+            return "No Reddit posts matched this query in the selected subreddit."
+        if stats.media_detected and stats.skipped_nsfw == stats.media_detected:
+            return "Matching media was found, but it is hidden by the NSFW filter."
+        if stats.skipped_text_only or stats.skipped_unsupported or stats.skipped_missing_loaded_metadata:
+            return "Matching posts were found, but none contained supported media."
+        return "No matching media found."
 
     def _is_retryable_error(self, error: Exception) -> bool:
         status = getattr(getattr(error, "response", None), "status_code", None)

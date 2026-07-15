@@ -23,25 +23,22 @@ class RedditConnectionService:
         logger.info("reddit.connection.start subreddit=python limit=1")
         try:
             reddit = self.client_provider.get_client()
-            read_only = bool(getattr(reddit, "read_only", False))
-            if not read_only:
-                try:
-                    reddit.read_only = True
-                except Exception:
-                    pass
-                read_only = bool(getattr(reddit, "read_only", False))
+            client_type, username = self.client_provider.client_context()
+            read_only = client_type != "authenticated"
 
             list(reddit.subreddit("python").new(limit=1))
             elapsed_ms = round((perf_counter() - started_at) * 1000)
             logger.info(
-                "reddit.connection.success read_only=%s elapsed_ms=%s",
+                "reddit.connection.success read_only=%s client_type=%s username=%s elapsed_ms=%s",
                 read_only,
+                client_type,
+                username,
                 elapsed_ms,
             )
             return RedditConnectionStatus(
                 connected=True,
                 read_only=read_only,
-                authenticated_user=None,
+                authenticated_user=username,
             )
         except ConfigurationError as exc:
             elapsed_ms = round((perf_counter() - started_at) * 1000)

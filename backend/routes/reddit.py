@@ -5,15 +5,15 @@ from backend.api.dependencies import (
     get_reddit_search_service,
 )
 from backend.api.errors import InvalidSubredditError, RedditSearchError
-from backend.api.responses import GENERIC_REDDIT_SEARCH_ERROR
+from backend.config import settings
 from backend.models.reddit import RedditSearchResponse
 from backend.services.reddit import (
     ALLOWED_MEDIA_TYPES,
     ALLOWED_SORTS,
     ALLOWED_TIME_FILTERS,
-    SUBREDDIT_NAME_RE,
     RedditConnectionService,
     RedditSearchService,
+    normalize_subreddit_input,
 )
 from backend.utils.logging import get_logger
 
@@ -34,7 +34,7 @@ def test_reddit_connection(
             "reddit": {
                 "connected": True,
                 "read_only": result.read_only,
-                "authenticated_user": None,
+                "authenticated_user": result.authenticated_user,
             },
         }
     logger.warning("api.reddit.test.failure detail=%s", result.error)
@@ -43,7 +43,7 @@ def test_reddit_connection(
 
 @router.get("/reddit/search", response_model=RedditSearchResponse)
 def search_reddit_media(
-    q: str = Query(...),
+    q: str = Query(default=""),
     subreddit: str | None = Query(default=None),
     media_type: str = Query(default="all"),
     sort: str = Query(default="relevance"),
@@ -92,14 +92,52 @@ def search_reddit_media(
             query,
             clean_subreddit or "all",
         )
-        raise HTTPException(status_code=400, detail="Invalid subreddit name.") from None
+        raise HTTPException(
+            status_code=400,
+            detail="That subreddit could not be found or is unavailable.",
+        ) from None
     except RedditSearchError:
         logger.warning(
             "api.reddit.search.failure query=%r subreddit=%s",
             query,
             clean_subreddit or "all",
         )
-        raise HTTPException(status_code=502, detail=GENERIC_REDDIT_SEARCH_ERROR) from None
+        raise HTTPException(status_code=502, detail="Reddit search is temporarily unavailable.") from None
+
+
+@router.get("/reddit/search/debug")
+def debug_reddit_search(
+    q: str = Query(default=""),
+    subreddit: str | None = Query(default=None),
+    sort: str = Query(default="relevance"),
+    time_filter: str = Query(default="all"),
+    limit: int = Query(default=10),
+    syntax: str = Query(default="lucene"),
+    service: RedditSearchService = Depends(get_reddit_search_service),
+) -> dict[str, object]:
+    if not settings.debug:
+        raise HTTPException(status_code=404, detail="Not found.")
+    query, clean_subreddit = validate_search_params(
+        q, subreddit, "all", sort, time_filter, limit
+    )
+    if syntax not in {"lucene", "plain", "cloudsearch"}:
+        raise HTTPException(status_code=400, detail="Invalid syntax.")
+    try:
+        return service.debug_raw_search(
+            query=query,
+            subreddit=clean_subreddit,
+            sort=sort,
+            time_filter=time_filter,
+            limit=limit,
+            syntax=syntax,
+        )
+    except InvalidSubredditError:
+        raise HTTPException(
+            status_code=400,
+            detail="That subreddit could not be found or is unavailable.",
+        ) from None
+    except RedditSearchError:
+        raise HTTPException(status_code=502, detail="Reddit search is temporarily unavailable.") from None
 
 
 def validate_search_params(
@@ -111,14 +149,15 @@ def validate_search_params(
     limit: int,
 ) -> tuple[str, str | None]:
     clean_query = query.strip()
-    if not clean_query:
-        raise HTTPException(status_code=400, detail="Search query is required.")
-
-    clean_subreddit = subreddit.strip() if subreddit else None
-    if clean_subreddit and clean_subreddit.startswith("r/"):
-        clean_subreddit = clean_subreddit[2:]
-    if clean_subreddit and not SUBREDDIT_NAME_RE.fullmatch(clean_subreddit):
-        raise HTTPException(status_code=400, detail="Invalid subreddit name.")
+    try:
+        clean_subreddit = normalize_subreddit_input(subreddit)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="That subreddit could not be found or is unavailable.",
+        ) from None
+    if not clean_query and not clean_subreddit:
+        raise HTTPException(status_code=400, detail="Search query or subreddit is required.")
 
     if media_type not in ALLOWED_MEDIA_TYPES:
         raise HTTPException(status_code=400, detail="Invalid media_type.")

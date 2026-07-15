@@ -10,6 +10,8 @@ export function renderSearchState(elements, state, visibleItems) {
   );
   setHidden(elements.loadingState, !state.loading);
   setHidden(elements.errorState, !state.error);
+  elements.emptyMessage.textContent =
+    state.emptyMessage || "Try choosing another media type filter.";
   elements.errorMessage.textContent = state.error || "Unable to search Reddit at this time.";
   elements.loadMoreRow.hidden =
     !state.hasSearched || state.loading || Boolean(state.error) || !state.nextAfter;
@@ -33,9 +35,11 @@ export function renderSearchHeading(elements, state, visibleItems) {
   const selectedVisible = visibleItems.filter((item) => state.selectedIds.has(item.id)).length;
   const resultWord = visibleItems.length === 1 ? "result" : "results";
   if (state.hasSearched) {
-    elements.resultsTitle.textContent = `Showing results for "${state.searchQuery}"`;
+    elements.resultsTitle.textContent = state.searchQuery
+      ? `Showing results for "${state.searchQuery}"`
+      : `Browsing r/${state.subreddit}`;
     elements.resultSummary.textContent =
-      `${visibleItems.length} ${resultWord} for "${state.searchQuery}" - ${selectedVisible} selected`;
+      `${visibleItems.length} ${resultWord} - ${selectedVisible} selected`;
     return;
   }
 

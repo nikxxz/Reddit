@@ -1,6 +1,10 @@
 import { fetchAppConfig } from "./api/healthApi.js";
 import { elements } from "./config.js";
-import { checkConnections, initializeConnectionsPage } from "./pages/connectionsPage.js";
+import {
+  checkConnections,
+  initializeConnectionsPage,
+  refreshRedditAuthStatus,
+} from "./pages/connectionsPage.js";
 import { initializeDownloadsPage } from "./pages/downloadsPage.js";
 import { initializeHistoryPage } from "./pages/historyPage.js";
 import { initializeSearchPage } from "./pages/searchPage.js";
@@ -11,7 +15,7 @@ import { normalizeUsername } from "./utils/formatting.js";
 
 
 function applyAppConfig() {
-  const username = normalizeUsername(state.redditUsername);
+  const username = normalizeUsername(state.redditAuth.username || state.redditUsername);
   const usernameText = username ? `u/${username}` : "No Reddit username set";
   const brandInitial = state.appName.trim().charAt(0).toUpperCase() || "M";
 
@@ -49,6 +53,7 @@ function init() {
   renderActivePage(elements);
   loadAppConfig();
   checkConnections(elements);
+  refreshRedditAuthStatus(elements);
 }
 
 

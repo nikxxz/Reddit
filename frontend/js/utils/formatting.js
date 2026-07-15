@@ -9,7 +9,20 @@ export function normalizeUsername(username) {
 
 
 export function normalizeSubreddit(value) {
-  return value.trim().replace(/^\/?r\//i, "");
+  let cleaned = value.trim();
+  try {
+    const parsed = new URL(cleaned);
+    if (
+      ["reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com"].includes(
+        parsed.hostname.toLowerCase(),
+      )
+    ) {
+      cleaned = parsed.pathname;
+    }
+  } catch {
+    // Treat non-URL input as a subreddit name or r/name path.
+  }
+  return cleaned.trim().replace(/^\/?r\//i, "").replace(/^\/+|\/+$/g, "");
 }
 
 

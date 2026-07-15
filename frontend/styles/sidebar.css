@@ -108,6 +108,65 @@
   border-top: 1px solid var(--color-border);
 }
 
+.account-panel {
+  display: grid;
+  gap: 0.35rem;
+  padding-top: 0.8rem;
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.account-title {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.account-state {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.account-icon {
+  display: none;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 6px;
+  background: #ff4500;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.account-username {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  min-height: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-button {
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.account-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .status-row {
   justify-content: space-between;
   gap: 0.75rem;
@@ -167,6 +226,10 @@
 .sidebar-collapsed .nav-label,
 .sidebar-collapsed .status-label,
 .sidebar-collapsed .status-text,
+.sidebar-collapsed .account-title,
+.sidebar-collapsed .account-status,
+.sidebar-collapsed .account-username,
+.sidebar-collapsed .account-button,
 .sidebar-collapsed .toggle-label,
 .sidebar-collapsed .toggle-expanded {
   opacity: 0;
@@ -181,9 +244,19 @@
 .sidebar-collapsed .sidebar-brand,
 .sidebar-collapsed .nav-item,
 .sidebar-collapsed .status-row,
+.sidebar-collapsed .account-panel,
+.sidebar-collapsed .account-state,
 .sidebar-collapsed .sidebar-toggle {
   justify-content: center;
   width: 100%;
+}
+
+.sidebar-collapsed .account-panel {
+  place-items: center;
+}
+
+.sidebar-collapsed .account-icon {
+  display: grid;
 }
 
 .sidebar-collapsed .nav-item {

@@ -6,6 +6,21 @@ export function testRedditConnection() {
 }
 
 
+export function getRedditAuthStatus() {
+  return requestJson("/api/reddit/auth/status");
+}
+
+
+export function startRedditAuth() {
+  return requestJson("/api/reddit/auth/login");
+}
+
+
+export function logoutRedditAuth() {
+  return requestJson("/api/reddit/auth/logout", { method: "POST" });
+}
+
+
 export function searchRedditMedia(params) {
   const searchParams = new URLSearchParams({
     q: params.query,

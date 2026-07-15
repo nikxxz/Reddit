@@ -39,6 +39,7 @@ class Settings:
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")
     app_port: int = int(os.getenv("APP_PORT", "8000"))
     download_dir: str = os.getenv("DOWNLOAD_DIR", "downloads")
+    session_file: str = os.getenv("SESSION_FILE", "backend/data/session.json")
     debug: bool = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
     reddit_connect_timeout: float = float(os.getenv("REDDIT_CONNECT_TIMEOUT", "10"))
     reddit_read_timeout: float = float(os.getenv("REDDIT_READ_TIMEOUT", "20"))
@@ -49,11 +50,16 @@ class Settings:
     max_download_retries: int = int(os.getenv("MAX_DOWNLOAD_RETRIES", "2"))
     search_limit: int = int(os.getenv("SEARCH_LIMIT", "24"))
     search_fetch_multiplier: int = int(os.getenv("SEARCH_FETCH_MULTIPLIER", "3"))
+    search_syntax: str = os.getenv("SEARCH_SYNTAX", "lucene")
     max_concurrent_downloads: int = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "2"))
     reddit_username: str | None = os.getenv("REDDIT_USERNAME")
     reddit_client_id: str | None = os.getenv("REDDIT_CLIENT_ID")
     reddit_client_secret: str | None = os.getenv("REDDIT_CLIENT_SECRET")
     reddit_user_agent: str | None = os.getenv("REDDIT_USER_AGENT")
+    reddit_redirect_uri: str = os.getenv(
+        "REDDIT_REDIRECT_URI",
+        f"http://{'127.0.0.1' if app_host == '0.0.0.0' else app_host}:{app_port}/api/reddit/auth/callback",
+    )
 
     def validate_reddit_settings(self) -> None:
         validate_reddit_settings_values(
@@ -65,6 +71,13 @@ class Settings:
     @property
     def download_dir_path(self) -> Path:
         path = Path(self.download_dir)
+        if not path.is_absolute():
+            path = BASE_DIR / path
+        return path
+
+    @property
+    def session_file_path(self) -> Path:
+        path = Path(self.session_file)
         if not path.is_absolute():
             path = BASE_DIR / path
         return path
