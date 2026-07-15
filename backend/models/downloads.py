@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-DownloadScope = Literal["single", "gallery_current", "gallery_all"]
+DownloadScope = Literal["single", "gallery_current", "gallery_all", "gallery_missing"]
 DownloadStatus = Literal[
     "queued",
     "resolving",
@@ -32,19 +32,26 @@ class DownloadRequest(BaseModel):
     gallery_index: int | None = None
     download_scope: DownloadScope = "single"
     force_hydrate: bool = False
+    force_download: bool = False
 
 
 class DownloadStartResponse(BaseModel):
     job_id: str
     status: DownloadStatus
+    duplicate: bool = False
+    existing_download_id: str | None = None
+    message: str | None = None
 
 
 class DownloadedFile(BaseModel):
+    id: str | None = None
     filename: str | None = None
     category: str | None = None
     index: int | None = None
     status: str = "completed"
     error: str | None = None
+    size_bytes: int | None = None
+    exists_on_disk: bool | None = None
 
 
 class DownloadStatusResponse(BaseModel):
@@ -64,9 +71,11 @@ DownloadJobFilter = Literal["all", "active", "queued", "completed", "failed", "c
 
 
 class DownloadJobSummary(BaseModel):
+    id: str | None = None
     job_id: str
     post_id: str
     status: DownloadStatus
+    availability: str = "unknown"
     progress: int | None = None
     message: str = ""
     media_type: str

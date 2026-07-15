@@ -23,6 +23,8 @@ from backend.services.downloads.gallery import download_gallery_urls
 from backend.services.downloads.resolver import RETRYABLE_RESOLUTION_CODES, resolve_download_request
 from backend.services.reddit.media_cache import normalized_media_cache
 from backend.services.downloads.yt_dlp_service import download_with_yt_dlp, ffmpeg_available
+from backend.services.library import persistence as library_persistence
+from backend.services.library.duplicates import duplicate_for_request
 from backend.services.system import PART_SUFFIX, cleanup_stale_part_files, has_minimum_free_space
 from backend.utils.logging import get_logger
 
@@ -72,6 +74,7 @@ class DownloadJob:
     started_at_wall: datetime | None = None
     completed_at_wall: datetime | None = None
     partial_paths: set[Path] = field(default_factory=set)
+    library_download_id: str | None = None
 
 
 class DownloadJobManager:
@@ -85,7 +88,11 @@ class DownloadJobManager:
         self.cleanup_jobs()
         if not has_minimum_free_space(settings.download_dir_path):
             raise DownloadError("Not enough free disk space to start this download.")
+        duplicate = duplicate_for_request(request)
+        if duplicate is not None:
+            raise DownloadError("This media already exists in your library.")
         job = DownloadJob(job_id=str(uuid.uuid4()), request=request)
+        job.library_download_id = library_persistence.create_download(job.job_id, request)
         with self.lock:
             self.jobs[job.job_id] = job
         logger.info(
@@ -236,6 +243,12 @@ class DownloadJobManager:
                 for key, value in updates.items():
                     setattr(job, key, value)
                 job.updated_at = monotonic()
+                library_persistence.update_status(
+                    job.job_id,
+                    new_status,
+                    error_code=getattr(job, "error_code", None),
+                    error_message=getattr(job, "error", None),
+                )
                 return True
             if new_status not in LEGAL_TRANSITIONS.get(job.status, set()):
                 logger.warning(
@@ -255,6 +268,12 @@ class DownloadJobManager:
                 job.completed_at_wall = datetime.now(timezone.utc)
             if new_status == "cancelled":
                 logger.info("download.job.cancelled job_id=%s", job.job_id)
+            library_persistence.update_status(
+                job.job_id,
+                new_status,
+                error_code=getattr(job, "error_code", None),
+                error_message=getattr(job, "error", None),
+            )
             return True
 
     async def _run_job(self, job: DownloadJob) -> None:
@@ -292,6 +311,7 @@ class DownloadJobManager:
                 else:
                     raise DownloadError("The selected media cannot be downloaded.")
 
+                library_persistence.finalize_download(job.job_id, expected_file_count=len(resolved.urls))
                 if self.transition_job(job, "completed", progress=100, message=job.message or "Download completed"):
                     logger.info(
                         "download.job.completed job_id=%s elapsed_ms=%s",
@@ -340,6 +360,7 @@ class DownloadJobManager:
             return
         job.filename = path.name
         job.files = [{"filename": path.name, "category": resolved.category, "status": "completed"}]
+        library_persistence.persist_file(job.job_id, path, resolved.category)
         job.message = "Download completed"
         logger.info(
             "download.direct.completed job_id=%s filename=%s bytes=%s",
@@ -383,6 +404,15 @@ class DownloadJobManager:
         ]
         job.files = files
         job.filename = completed[0]["filename"] if len(completed) == 1 else None
+        for item in completed:
+            filename = item.get("filename")
+            if filename:
+                library_persistence.persist_file(
+                    job.job_id,
+                    resolved.output_dir / str(filename),
+                    resolved.category,
+                    gallery_index=item.get("index"),
+                )
         job.message = (
             "One or more gallery items could not be downloaded."
             if failed
@@ -432,6 +462,7 @@ class DownloadJobManager:
             return
         job.filename = path.name
         job.files = [{"filename": path.name, "category": resolved.category, "status": "completed"}]
+        library_persistence.persist_file(job.job_id, path, resolved.category)
         job.message = "Download completed"
         logger.info("download.ytdlp.completed job_id=%s filename=%s", job.job_id, path.name)
 

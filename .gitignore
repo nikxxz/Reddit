@@ -7,6 +7,14 @@ __pycache__/
 .env
 downloads/*
 !downloads/.gitkeep
+app-data/database/*.sqlite3
+app-data/database/*.sqlite3-wal
+app-data/database/*.sqlite3-shm
+app-data/backups/*.sqlite3
+app-data/thumbnails/generated/*
+!app-data/database/.gitkeep
+!app-data/backups/.gitkeep
+!app-data/thumbnails/generated/.gitkeep
 backend/data/session.json
 .vscode/
 .idea/

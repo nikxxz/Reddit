@@ -29,7 +29,7 @@ export function DownloadsPage() {
             Downloads
           </Title>
           <Text size="sm" c="gray.6">
-            All retained download jobs from this backend session.
+            Active jobs and persistent local download history.
           </Text>
         </Stack>
         {loading ? (

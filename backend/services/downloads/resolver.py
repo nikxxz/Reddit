@@ -195,7 +195,7 @@ def _needs_hydration(item: RedditMediaItem | None, request: DownloadRequest) -> 
         return True
     if item.media_type not in {"image", "gif", "video", "gallery", "external"}:
         return True
-    if request.download_scope in {"gallery_current", "gallery_all"}:
+    if request.download_scope in {"gallery_current", "gallery_all", "gallery_missing"}:
         if not _gallery_urls(item):
             return True
         return False
@@ -211,7 +211,7 @@ def _needs_hydration(item: RedditMediaItem | None, request: DownloadRequest) -> 
 def _resolve_item(item: RedditMediaItem | None, request: DownloadRequest) -> ResolvedDownload:
     if item is None:
         raise MediaResolutionError("missing_cached_item")
-    if request.download_scope in {"gallery_current", "gallery_all"}:
+    if request.download_scope in {"gallery_current", "gallery_all", "gallery_missing"}:
         return _resolve_gallery(item, request)
     media_type = item.media_type
     if media_type == "image":

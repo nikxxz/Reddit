@@ -8,9 +8,11 @@ from backend.config import settings
 from backend.routes.auth import router as auth_router
 from backend.routes.downloads import router as downloads_router
 from backend.routes.health import router as health_router
+from backend.routes.library import router as library_router
 from backend.routes.reddit import router as reddit_router
 from backend.routes.system import router as system_router
 from backend.services.downloads.manager import download_job_manager
+from backend.services.library.startup import initialize_library
 from backend.services.reddit.oauth import reddit_oauth_manager
 from backend.services.system import startup_diagnostics
 from backend.utils.logging import configure_logging
@@ -22,6 +24,7 @@ app.include_router(health_router, prefix="/api")
 app.include_router(reddit_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(downloads_router, prefix="/api")
+app.include_router(library_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -79,6 +82,7 @@ def frontend_not_built_response() -> HTMLResponse:
 
 @app.on_event("startup")
 def restore_reddit_auth_session() -> None:
+    initialize_library()
     startup_diagnostics()
     download_job_manager.cleanup_stale_part_files()
     reddit_oauth_manager.restore_session()

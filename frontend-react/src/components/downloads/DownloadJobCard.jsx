@@ -1,5 +1,5 @@
 import { Collapse, Group, Image, Paper, Stack, Text, ThemeIcon, UnstyledButton } from "@mantine/core";
-import { IconFile, IconPhoto } from "@tabler/icons-react";
+import { IconAlertTriangle, IconFile, IconPhoto } from "@tabler/icons-react";
 import { useState } from "react";
 import { DownloadJobActions } from "./DownloadJobActions";
 import { DownloadJobProgress } from "./DownloadJobProgress";
@@ -11,6 +11,13 @@ const MEDIA_LABELS = {
   gif: "GIF",
   gallery: "Gallery",
   external: "External"
+};
+
+const AVAILABILITY_LABELS = {
+  available: "Available",
+  partially_available: "Partially available",
+  missing: "Missing files",
+  unknown: "Not verified"
 };
 
 function formatTime(value) {
@@ -32,7 +39,7 @@ function completedFiles(files) {
 }
 
 function failedFiles(files) {
-  return files.filter((file) => file.status === "failed");
+  return files.filter((file) => file.status === "failed" || file.status === "missing" || file.exists_on_disk === false);
 }
 
 export function DownloadJobCard({
@@ -42,6 +49,7 @@ export function DownloadJobCard({
   onRetry
 }) {
   const [filesOpen, setFilesOpen] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const completed = completedFiles(job.files);
   const failed = failedFiles(job.files);
   const displayTitle =
@@ -60,8 +68,8 @@ export function DownloadJobCard({
     <Paper className="download-job-card" withBorder p="md">
       <div className="download-job-card-grid">
         <div className="download-job-thumb" aria-hidden="true">
-          {job.thumbnailUrl ? (
-            <Image src={job.thumbnailUrl} alt="" fit="cover" />
+          {job.thumbnailUrl && !thumbnailFailed ? (
+            <Image src={job.thumbnailUrl} alt="" fit="cover" onError={() => setThumbnailFailed(true)} />
           ) : (
             <ThemeIcon variant="light" size="xl">
               <IconPhoto size={22} stroke={1.8} />
@@ -78,6 +86,17 @@ export function DownloadJobCard({
               <Text size="sm" c="gray.6">
                 {meta.join(" - ")}
               </Text>
+              {job.availability && job.availability !== "unknown" ? (
+                <Text
+                  size="sm"
+                  c={job.availability === "missing" ? "red.7" : job.availability === "partially_available" ? "yellow.8" : "gray.6"}
+                >
+                  {job.availability === "missing" ? (
+                    <IconAlertTriangle size={14} stroke={1.8} style={{ verticalAlign: "text-bottom", marginRight: 4 }} />
+                  ) : null}
+                  {AVAILABILITY_LABELS[job.availability] || job.availability}
+                </Text>
+              ) : null}
             </Stack>
             <DownloadStatusBadge status={job.status} />
           </Group>
@@ -95,7 +114,7 @@ export function DownloadJobCard({
             <Stack gap={6}>
               <Text size="sm" c="gray.7">
                 {job.mediaType === "gallery"
-                  ? `${completed.length} of ${job.files.length} files completed${failed.length ? `, ${failed.length} failed` : ""}`
+                  ? `${completed.length} of ${job.files.length} files available${failed.length ? `, ${failed.length} missing or failed` : ""}`
                   : completed.map((file) => file.filename).filter(Boolean).join(", ")}
               </Text>
               {job.files.length > 1 ? (

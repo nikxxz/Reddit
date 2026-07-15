@@ -14,6 +14,8 @@ The current authoritative frontend is `frontend-react/`, built with React, Vite,
 - Responsive media grid with preview modal and gallery carousel
 - Downloads for images, GIFs, videos, supported external media, and galleries
 - Background download jobs with progress, result files, failures, and cancellation
+- SQLite-backed persistent download history with portable relative file paths
+- Local thumbnails for downloaded history items with dummy fallback
 - Safe diagnostics endpoint at `GET /api/system/status`
 
 ## Project Structure
@@ -49,6 +51,14 @@ downloads/
   gifs/
   galleries/
   external/
+
+app-data/
+  database/
+  thumbnails/generated/
+  sessions/
+  backups/
+  logs/
+  settings/
 ```
 
 ## Requirements
@@ -99,10 +109,12 @@ Copy `.env.example` to `.env` and fill in the Reddit credentials. Do not commit 
 Important settings:
 
 - `APP_HOST`, `APP_PORT`, `APP_NAME`, `DEBUG`
+- `APP_DATA_DIR`, `DATABASE_FILENAME`, `THUMBNAIL_FORMAT`, `THUMBNAIL_MAX_WIDTH`, `THUMBNAIL_MAX_HEIGHT`
 - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, `REDDIT_REDIRECT_URI`, `SESSION_FILE`
 - `SEARCH_LIMIT`, `SEARCH_FETCH_MULTIPLIER`, `SEARCH_SYNTAX`, `MAX_API_RETRIES`
 - `DOWNLOAD_DIR`, `MAX_CONCURRENT_DOWNLOADS`, `MAX_DOWNLOAD_SIZE_MB`
 - `DOWNLOAD_JOB_RETENTION_HOURS`, `FAILED_JOB_RETENTION_HOURS`, `PART_FILE_MAX_AGE_HOURS`, `MIN_FREE_DISK_GB`
+- `DATABASE_BACKUP_RETENTION`, `DATABASE_BACKUP_INTERVAL_HOURS`, `LIBRARY_RECONCILE_ON_STARTUP`, `GENERATE_MISSING_THUMBNAILS_ON_STARTUP`
 
 ## Download Behavior
 
@@ -132,9 +144,42 @@ Gallery item format:
 
 Gallery downloads may produce multiple files. Duplicate target filenames receive suffixes so existing files are not overwritten. Temporary `.part` files are used while direct downloads stream to disk; stale `.part` files under the configured download root are cleaned up on startup after the configured age threshold.
 
+## Portable Media Library
+
+The persistent library database lives at `app-data/database/reddit_media_library.sqlite3`.
+
+Downloaded media remains as normal files under `downloads/`; the database stores history, file metadata, checksums, relative paths, and thumbnail records. It does not store OAuth tokens, Reddit secrets, browser cookies, raw PRAW objects, absolute installation paths, or the media files themselves.
+
+For a full portable restore:
+
+1. Stop the application.
+2. Copy `app-data/`.
+3. Copy `downloads/`.
+4. Copy `.env` only when appropriate for that machine.
+5. Start the application from the new location.
+6. The app opens the database and reconciles history against the moved `downloads/` folder.
+
+Copying only `app-data/` restores the history database, but downloaded files may appear missing until the matching `downloads/` tree is restored. Missing files do not erase history; records keep their completed, failed, or cancelled status and update a separate availability field.
+
+Generated thumbnails live under `app-data/thumbnails/generated/`. The backend prefers generated local thumbnails, then downloaded local media, then a dummy thumbnail. Video thumbnails use FFmpeg when available. Image and GIF thumbnail generation uses Pillow when installed; without it, the app falls back to local files or the dummy thumbnail.
+
+## Database Backups
+
+Routine SQLite backups are written to `app-data/backups/`.
+
+The app uses SQLite's backup API, creates pre-migration backups before applying pending migrations to an existing database, and retains the newest `DATABASE_BACKUP_RETENTION` routine backups. It only prunes backup files matching this application's backup naming pattern.
+
+Manual restore:
+
+1. Stop the application.
+2. Back up the current `app-data/` directory.
+3. Replace `app-data/database/reddit_media_library.sqlite3` with the selected backup.
+4. Start the application.
+5. Let startup reconciliation update file and thumbnail availability.
+
 ## Reliability And Diagnostics
 
-Download jobs are in memory. Completed jobs are retained for `DOWNLOAD_JOB_RETENTION_HOURS`; failed and cancelled jobs are retained for `FAILED_JOB_RETENTION_HOURS`. Cleanup removes only job metadata, never downloaded media.
+Active download jobs are in memory. Historical completed, failed, and cancelled downloads are persisted in SQLite. Cleanup removes only history records, never downloaded media.
 
 Retained jobs are available at `GET /api/downloads`. The response returns safe job summaries ordered by active jobs first, then queued, failed, completed, and cancelled jobs, newest first within each group. Failed and cancelled jobs can be retried with `POST /api/downloads/{job_id}/retry`; the retry creates a new job ID and keeps the old terminal job unchanged. Terminal metadata can be cleared with `DELETE /api/downloads/terminal` without deleting downloaded files.
 
@@ -150,7 +195,7 @@ Safe diagnostics are available at:
 GET /api/system/status
 ```
 
-The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, and queued download count. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
+The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, schema version, backup availability, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
 
 The React app currently has no real settings or connections page beyond sidebar/status components, so diagnostics are backend-only for now. A future UI block should live on a real settings or connections page, not on the search page.
 
@@ -190,15 +235,15 @@ npm run build
 This is a local personal tool. Treat it as host-machine access to downloads and OAuth state:
 
 - Do not expose it directly to the public internet.
-- Do not commit `.env` or `backend/data/session.json`.
+- Do not commit `.env`, app-data session files, SQLite databases, generated thumbnails, backups, or downloaded media.
 - Do not share logs that might contain post metadata you consider private.
 - Use LAN access only on networks you trust.
 - Keep `yt-dlp` and FFmpeg installed from trusted sources.
 
 ## Current Limitations
 
-- Download history is not persisted.
-- Jobs are in memory and are lost on backend restart.
+- Automatic orphan-file import is not implemented.
+- Gallery "download missing items" is detected as partial history but queued as a full retry in this milestone.
 - The diagnostics endpoint is backend-only until a real settings or connections page exists.
 - The legacy `frontend/` tree has not been removed.
 - OAuth redirect behavior across LAN devices depends on matching Reddit app callback configuration.

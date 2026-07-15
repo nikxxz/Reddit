@@ -27,6 +27,7 @@ function normalizeJob(job) {
     jobId: job.job_id,
     postId: job.post_id,
     status: job.status,
+    availability: job.availability || "unknown",
     progress: job.progress ?? null,
     message: job.message || "",
     mediaType: job.media_type || "media",
