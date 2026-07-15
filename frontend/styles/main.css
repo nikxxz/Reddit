@@ -1,0 +1,51 @@
+@import url("./layout.css");
+@import url("./sidebar.css");
+@import url("./search.css");
+@import url("./filters.css");
+@import url("./cards.css");
+@import url("./states.css");
+@import url("./responsive.css");
+
+:root {
+  --color-bg: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-border: #dfe4ec;
+  --color-text: #1f2937;
+  --color-muted: #64748b;
+  --color-primary: #2563eb;
+  --color-primary-soft: #eff6ff;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --shadow-card: 0 12px 30px rgba(15, 23, 42, 0.07);
+  --shadow-hover: 0 18px 42px rgba(15, 23, 42, 0.12);
+  --sidebar-expanded: 220px;
+  --sidebar-collapsed: 72px;
+  --radius-panel: 14px;
+  --radius-card: 12px;
+  --transition-fast: 180ms ease;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  overflow-x: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}

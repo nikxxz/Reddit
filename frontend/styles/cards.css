@@ -1,0 +1,136 @@
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.media-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.media-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.media-card.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), var(--shadow-card);
+}
+
+.thumbnail {
+  position: relative;
+  min-height: 168px;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.thumbnail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.08)),
+    var(--thumb-bg);
+}
+
+.thumbnail.has-image::before {
+  content: none;
+}
+
+.thumbnail img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail-label {
+  position: relative;
+  z-index: 1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.media-badge,
+.select-wrap {
+  position: absolute;
+  z-index: 2;
+  top: 0.65rem;
+}
+
+.media-badge {
+  left: 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.select-wrap {
+  right: 0.65rem;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.select-wrap input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.card-body {
+  padding: 0.9rem;
+}
+
+.card-body h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.subreddit {
+  margin: 0 0 0.65rem;
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.media-meta,
+.card-footnote {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.media-meta {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+}
+
+.card-footnote {
+  margin: 0;
+}

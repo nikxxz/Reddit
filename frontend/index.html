@@ -8,7 +8,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='white'%3EM%3C/text%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles/main.css" />
   </head>
   <body>
     <div class="app-shell" id="app-shell">
@@ -22,21 +22,25 @@
         </div>
 
         <nav class="sidebar-nav" aria-label="Primary navigation">
-          <button class="nav-item active" type="button" title="Search" aria-current="page">
+          <button class="nav-item active" type="button" title="Search" data-page-target="search">
             <span class="nav-icon" aria-hidden="true">S</span>
             <span class="nav-label">Search</span>
           </button>
-          <button class="nav-item" type="button" title="Downloads">
+          <button class="nav-item" type="button" title="Downloads" data-page-target="downloads">
             <span class="nav-icon" aria-hidden="true">D</span>
             <span class="nav-label">Downloads</span>
           </button>
-          <button class="nav-item" type="button" title="History">
+          <button class="nav-item" type="button" title="History" data-page-target="history">
             <span class="nav-icon" aria-hidden="true">H</span>
             <span class="nav-label">History</span>
           </button>
-          <button class="nav-item" type="button" title="Settings">
+          <button class="nav-item" type="button" title="Settings" data-page-target="settings">
             <span class="nav-icon" aria-hidden="true">G</span>
             <span class="nav-label">Settings</span>
+          </button>
+          <button class="nav-item" type="button" title="Connections" data-page-target="connections">
+            <span class="nav-icon" aria-hidden="true">C</span>
+            <span class="nav-label">Connections</span>
           </button>
         </nav>
 
@@ -71,79 +75,141 @@
       </aside>
 
       <main class="main-content">
-        <header class="top-panel">
-          <button
-            class="mobile-sidebar-toggle"
-            id="mobile-sidebar-toggle"
-            type="button"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-          >
-            Menu
-          </button>
+        <section data-page="search">
+          <header class="top-panel">
+            <button
+              class="mobile-sidebar-toggle"
+              id="mobile-sidebar-toggle"
+              type="button"
+              aria-label="Toggle sidebar"
+              title="Toggle sidebar"
+            >
+              Menu
+            </button>
 
-          <form class="search-form" id="search-form">
-            <label for="search-input">Search Reddit media</label>
-            <div class="search-controls">
-              <input
-                id="search-input"
-                name="search"
-                type="search"
-                placeholder="Search images, videos, GIFs, or galleries"
-                autocomplete="off"
-              />
-              <button type="submit">Search</button>
+            <form class="search-form" id="search-form">
+              <label for="search-input">Search Reddit media</label>
+              <div class="search-controls">
+                <input
+                  id="search-input"
+                  name="search"
+                  type="search"
+                  placeholder="Search images, videos, GIFs, or galleries"
+                  autocomplete="off"
+                />
+                <input
+                  id="subreddit-input"
+                  name="subreddit"
+                  type="search"
+                  placeholder="Subreddit, e.g. wallpapers"
+                  autocomplete="off"
+                />
+                <button type="submit">Search</button>
+              </div>
+            </form>
+          </header>
+
+          <section class="controls-panel" aria-label="Media controls">
+            <div class="filter-group" role="group" aria-label="Media type filter">
+              <span class="control-label">Media:</span>
+              <button class="filter-button active" type="button" data-filter="all">All</button>
+              <button class="filter-button" type="button" data-filter="image">Images</button>
+              <button class="filter-button" type="button" data-filter="video">Videos</button>
+              <button class="filter-button" type="button" data-filter="gif">GIFs</button>
             </div>
-          </form>
-        </header>
 
-        <section class="controls-panel" aria-label="Media controls">
-          <div class="filter-group" role="group" aria-label="Media type filter">
-            <span class="control-label">Media:</span>
-            <button class="filter-button active" type="button" data-filter="all">
-              All
-            </button>
-            <button class="filter-button" type="button" data-filter="image">
-              Images
-            </button>
-            <button class="filter-button" type="button" data-filter="video">
-              Videos
-            </button>
-            <button class="filter-button" type="button" data-filter="gif">
-              GIFs
-            </button>
-          </div>
+            <label class="sort-control" for="sort-select">
+              <span class="control-label">Sort by:</span>
+              <select id="sort-select" name="sort">
+                <option value="relevance">Relevance</option>
+                <option value="new">New</option>
+                <option value="top">Top</option>
+                <option value="hot">Hot</option>
+                <option value="comments">Comments</option>
+              </select>
+            </label>
+          </section>
 
-          <label class="sort-control" for="sort-select">
-            <span class="control-label">Sort by:</span>
-            <select id="sort-select" name="sort">
-              <option value="relevance">Relevance</option>
-              <option value="new">New</option>
-              <option value="top">Top</option>
-              <option value="hot">Hot</option>
-            </select>
-          </label>
+          <section class="results-section" aria-labelledby="results-title">
+            <div class="results-header">
+              <div>
+                <h1 id="results-title">Browse sample media</h1>
+                <p id="result-summary">6 sample results - 0 selected</p>
+              </div>
+              <p class="sort-summary" id="sort-summary">Sorted by Relevance</p>
+            </div>
+
+            <div class="media-grid" id="media-grid" aria-live="polite"></div>
+
+            <div class="loading-state" id="loading-state" hidden>
+              <h2>Searching Reddit...</h2>
+              <div class="skeleton-grid" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+
+            <div class="empty-state" id="empty-state" hidden>
+              <h2>No matching media found</h2>
+              <p>Try choosing another media type filter.</p>
+            </div>
+
+            <div class="error-state" id="error-state" hidden>
+              <div>
+                <h2>Reddit search failed</h2>
+                <p id="error-message">Unable to search Reddit at this time.</p>
+              </div>
+              <button type="button" id="try-again-button">Try Again</button>
+            </div>
+
+            <div class="load-more-row" id="load-more-row" hidden>
+              <button type="button" id="load-more-button">Load More</button>
+            </div>
+          </section>
         </section>
 
-        <section class="results-section" aria-labelledby="results-title">
-          <div class="results-header">
-            <div>
-              <h1 id="results-title">Browse sample media</h1>
-              <p id="result-summary">6 sample results - 0 selected</p>
-            </div>
-            <p class="sort-summary" id="sort-summary">Sorted by Relevance</p>
+        <section class="placeholder-page" data-page="downloads" hidden>
+          <h1>Downloads</h1>
+          <p>Downloads will be implemented in a later milestone.</p>
+        </section>
+
+        <section class="placeholder-page" data-page="history" hidden>
+          <h1>History</h1>
+          <p>History will be implemented in a later milestone.</p>
+        </section>
+
+        <section class="placeholder-page" data-page="settings" hidden>
+          <h1>Settings</h1>
+          <p>Settings will be implemented in a later milestone.</p>
+        </section>
+
+        <section class="connections-page" data-page="connections" hidden>
+          <div class="connections-header">
+            <h1>Connections</h1>
+            <button type="button" id="retry-connections-button">Retry</button>
           </div>
-
-          <div class="media-grid" id="media-grid" aria-live="polite"></div>
-
-          <div class="empty-state" id="empty-state" hidden>
-            <h2>No matching media found</h2>
-            <p>Try choosing another media type filter.</p>
+          <div class="connections-panel">
+            <div class="connection-row">
+              <span>Backend API</span>
+              <strong id="connection-backend">Checking</strong>
+            </div>
+            <div class="connection-row">
+              <span>Reddit API</span>
+              <strong id="connection-reddit">Checking</strong>
+            </div>
+            <div class="connection-row">
+              <span>Reddit mode</span>
+              <strong id="connection-mode">Unavailable</strong>
+            </div>
           </div>
         </section>
       </main>
     </div>
 
-    <script src="/app.js"></script>
+    <script type="module" src="/js/app.js"></script>
   </body>
 </html>

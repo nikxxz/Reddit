@@ -7,7 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import settings
 from backend.routes.health import router as health_router
 from backend.routes.reddit import router as reddit_router
+from backend.utils.logging import configure_logging
 
+configure_logging(settings.debug)
 app = FastAPI(title=settings.app_name)
 
 app.include_router(health_router, prefix="/api")
@@ -18,6 +20,9 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 DOWNLOAD_DIR = settings.download_dir_path
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+app.mount("/styles", StaticFiles(directory=FRONTEND_DIR / "styles"), name="styles")
+app.mount("/js", StaticFiles(directory=FRONTEND_DIR / "js"), name="js")
+app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
@@ -29,8 +34,3 @@ def read_index() -> FileResponse:
 @app.get("/styles.css")
 def get_styles() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "styles.css")
-
-
-@app.get("/app.js")
-def get_app_js() -> FileResponse:
-    return FileResponse(FRONTEND_DIR / "app.js")

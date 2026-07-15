@@ -1,0 +1,43 @@
+.controls-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-panel);
+}
+
+.filter-group,
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.filter-button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-muted);
+  padding: 0.45rem 0.8rem;
+}
+
+.filter-button:hover,
+.filter-button.active {
+  background: var(--color-primary-soft);
+  border-color: #93c5fd;
+  color: var(--color-primary);
+}
+
+.sort-control select {
+  padding: 0.45rem 0.65rem;
+}
