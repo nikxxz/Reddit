@@ -23,8 +23,35 @@
 .search-summary-card {
   box-sizing: border-box;
   width: 100%;
-  background: color-mix(in srgb, var(--mantine-color-gray-0) 70%, white);
-  border-color: var(--mantine-color-gray-3);
+  background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+  border-color: var(--border);
+  box-shadow: var(--shadow-raised);
+}
+
+.search-toolbar {
+  padding: 8px;
+  background: color-mix(in srgb, var(--background) 72%, var(--surface-raised));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.search-filter-toggle {
+  color: var(--mantine-color-teal-1);
+  border: 1px solid transparent;
+}
+
+.search-filter-toggle:hover {
+  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(94, 234, 212, 0.18);
+}
+
+.search-filters-popover {
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  background: var(--surface-raised);
+  border-color: var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-raised);
 }
 
 .search-form-row {
@@ -43,6 +70,20 @@
 
 .search-submit-button {
   flex: 0 0 auto;
+  min-height: 42px;
+  align-self: flex-end;
+}
+
+.search-toolbar .mantine-TextInput-input,
+.search-filters-popover .mantine-Select-input {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.search-toolbar .mantine-TextInput-input:focus,
+.search-filters-popover .mantine-Select-input:focus {
+  border-color: var(--mantine-color-teal-5);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .media-button-group {
@@ -52,6 +93,7 @@
 
 .media-button-group > * {
   min-height: 34px;
+  border-color: rgba(94, 234, 212, 0.16);
 }
 
 .filter-control-row {
@@ -75,6 +117,10 @@
     max-width: 280px;
   }
 
+  .search-filter-toggle {
+    width: 100%;
+  }
+
   .search-form-row {
     align-items: stretch;
     flex-direction: column;
@@ -86,6 +132,10 @@
     flex: 1 1 auto;
     width: 100%;
     min-width: 0;
+  }
+
+  .search-submit-button {
+    align-self: stretch;
   }
 
   .filter-select {
@@ -120,6 +170,11 @@
   .search-summary-card {
     max-width: 100%;
     overflow: hidden;
+  }
+
+  .search-toolbar {
+    padding: 6px;
+    border-radius: 14px;
   }
 
   .media-button-group > * {

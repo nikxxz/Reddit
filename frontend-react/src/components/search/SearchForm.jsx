@@ -1,4 +1,5 @@
 import { Button, Group, Stack, Text, TextInput } from "@mantine/core";
+import { IconSearch } from "@tabler/icons-react";
 
 export function SearchForm({ values, onFieldChange, onSubmit, keywordInputRef }) {
   const hasError = Boolean(values.validationError);
@@ -28,7 +29,11 @@ export function SearchForm({ values, onFieldChange, onSubmit, keywordInputRef })
               onFieldChange("subreddit", event.currentTarget.value)
             }
           />
-          <Button className="search-submit-button" type="submit">
+          <Button
+            className="search-submit-button"
+            leftSection={<IconSearch size={16} stroke={1.9} />}
+            type="submit"
+          >
             Search
           </Button>
         </Group>

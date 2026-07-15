@@ -1,5 +1,6 @@
-import { Divider, Paper, Stack, Text, Title } from "@mantine/core";
+import { Button, Group, Paper, Popover, Stack, Text, Title } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
+import { IconAdjustmentsHorizontal } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { SearchFilters } from "../components/search/SearchFilters";
 import { SearchForm } from "../components/search/SearchForm";
@@ -22,6 +23,7 @@ export function SearchPage() {
   const { state, runSearch, retrySearch, loadMore } = useRedditSearch();
   const isMobile = useMediaQuery("(max-width: 40em)");
   const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filtersPopoverOpened, setFiltersPopoverOpened] = useState(false);
   const lastSubmitRevisionRef = useRef(submitRevision);
   const keywordInputRef = useRef(null);
 
@@ -92,25 +94,48 @@ export function SearchPage() {
             radius="md"
           >
             <Stack gap="sm">
-              <Stack gap={3}>
-                <Title id="search-page-title" order={2} size="h4">
-                  Search Reddit media
-                </Title>
-                <Text className="search-page-description" size="sm" c="gray.6">
-                  Find images, videos, GIFs, galleries, and external media links.
-                </Text>
-              </Stack>
+              <Group justify="space-between" align="flex-start" gap="sm">
+                <Stack gap={3}>
+                  <Title id="search-page-title" order={2} size="h4">
+                    Search Reddit media
+                  </Title>
+                  <Text className="search-page-description" size="sm" c="gray.6">
+                    Find images, videos, GIFs, galleries, and external media links.
+                  </Text>
+                </Stack>
 
-              <SearchForm
-                values={values}
-                onFieldChange={setFieldValue}
-                onSubmit={submitSearch}
-                keywordInputRef={keywordInputRef}
-              />
+                <Popover
+                  opened={filtersPopoverOpened}
+                  onChange={setFiltersPopoverOpened}
+                  position="bottom-end"
+                  shadow="xl"
+                  width={360}
+                  withinPortal
+                >
+                  <Popover.Target>
+                    <Button
+                      className="search-filter-toggle"
+                      variant="subtle"
+                      leftSection={<IconAdjustmentsHorizontal size={16} stroke={1.8} />}
+                      onClick={() => setFiltersPopoverOpened((opened) => !opened)}
+                    >
+                      Filters
+                    </Button>
+                  </Popover.Target>
+                  <Popover.Dropdown className="search-filters-popover">
+                    <SearchFilters values={values} onFieldChange={setFieldValue} />
+                  </Popover.Dropdown>
+                </Popover>
+              </Group>
 
-              <Divider />
-
-              <SearchFilters values={values} onFieldChange={setFieldValue} />
+              <div className="search-toolbar">
+                <SearchForm
+                  values={values}
+                  onFieldChange={setFieldValue}
+                  onSubmit={submitSearch}
+                  keywordInputRef={keywordInputRef}
+                />
+              </div>
             </Stack>
           </Paper>
         ) : null}
