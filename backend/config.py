@@ -35,10 +35,12 @@ def validate_reddit_settings_values(
 
 
 class Settings:
+    app_name: str = os.getenv("APP_NAME", "Reddit Media Downloader")
     app_host: str = os.getenv("APP_HOST", "127.0.0.1")
     app_port: int = int(os.getenv("APP_PORT", "8000"))
     download_dir: str = os.getenv("DOWNLOAD_DIR", "downloads")
     debug: bool = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
+    reddit_username: str | None = os.getenv("REDDIT_USERNAME")
     reddit_client_id: str | None = os.getenv("REDDIT_CLIENT_ID")
     reddit_client_secret: str | None = os.getenv("REDDIT_CLIENT_SECRET")
     reddit_user_agent: str | None = os.getenv("REDDIT_USER_AGENT")

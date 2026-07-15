@@ -54,15 +54,18 @@ Expected `.env` keys:
 ```dotenv
 APP_HOST=127.0.0.1
 APP_PORT=8000
+APP_NAME=Reddit Media Downloader
 DOWNLOAD_DIR=downloads
 DEBUG=true
 
+REDDIT_USERNAME=your_username
 REDDIT_CLIENT_ID=your_client_id
 REDDIT_CLIENT_SECRET=your_client_secret
 REDDIT_USER_AGENT=windows:your-app-name:v0.1.0 (by /u/your_username)
 ```
 
 Keep `.env` private. It is ignored by git and should not be committed or shared.
+`APP_NAME` controls the browser/app title and `REDDIT_USERNAME` is displayed under the app title in the sidebar.
 
 ## Run the App
 
@@ -76,6 +79,7 @@ Then open:
 
 - Web app: http://127.0.0.1:8000
 - Health check: http://127.0.0.1:8000/api/health
+- Public app config: http://127.0.0.1:8000/api/app-config
 - Reddit connection test: http://127.0.0.1:8000/api/reddit/test
 
 When `DEBUG=true`, Uvicorn runs with reload enabled. That is useful for development, but use `DEBUG=false` if you want a single stable server process.

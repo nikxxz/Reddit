@@ -3,31 +3,146 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reddit Media Downloader</title>
+    <title>Media Finder</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='28' font-weight='700' fill='white'%3EM%3C/text%3E%3C/svg%3E"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="card">
-        <h1>Reddit Media Downloader</h1>
-        <p class="description">
-          Paste a Reddit post URL to inspect it and prepare media downloads.
-        </p>
+    <div class="app-shell" id="app-shell">
+      <aside class="sidebar" aria-label="Application navigation">
+        <div class="sidebar-brand">
+          <span class="brand-mark" id="brand-mark" aria-hidden="true">M</span>
+          <span class="brand-copy">
+            <span class="brand-text" id="app-title">Media Finder</span>
+            <span class="brand-subtext" id="app-username">Loading profile...</span>
+          </span>
+        </div>
 
-        <label class="input-group" for="reddit-url">
-          <span>Reddit URL</span>
-          <input
-            id="reddit-url"
-            name="reddit-url"
-            type="url"
-            placeholder="https://www.reddit.com/r/..."
-          />
-        </label>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+          <button class="nav-item active" type="button" title="Search" aria-current="page">
+            <span class="nav-icon" aria-hidden="true">S</span>
+            <span class="nav-label">Search</span>
+          </button>
+          <button class="nav-item" type="button" title="Downloads">
+            <span class="nav-icon" aria-hidden="true">D</span>
+            <span class="nav-label">Downloads</span>
+          </button>
+          <button class="nav-item" type="button" title="History">
+            <span class="nav-icon" aria-hidden="true">H</span>
+            <span class="nav-label">History</span>
+          </button>
+          <button class="nav-item" type="button" title="Settings">
+            <span class="nav-icon" aria-hidden="true">G</span>
+            <span class="nav-label">Settings</span>
+          </button>
+        </nav>
 
-        <button id="analyse-btn" type="button" disabled>Analyse</button>
-        <p id="status" class="status">Backend connection: checking...</p>
-      </section>
-    </main>
+        <section class="status-panel" aria-label="Connection status">
+          <div class="status-row" id="backend-status" title="Backend API: Checking">
+            <span class="status-label">Backend API</span>
+            <span class="status-value">
+              <span class="status-dot checking" aria-hidden="true"></span>
+              <span class="status-text">Checking</span>
+            </span>
+          </div>
+          <div class="status-row" id="reddit-status" title="Reddit API: Checking">
+            <span class="status-label">Reddit API</span>
+            <span class="status-value">
+              <span class="status-dot checking" aria-hidden="true"></span>
+              <span class="status-text">Checking</span>
+            </span>
+          </div>
+        </section>
+
+        <button
+          class="sidebar-toggle"
+          id="sidebar-toggle"
+          type="button"
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
+        >
+          <span class="toggle-expanded" aria-hidden="true">&lt;&lt;</span>
+          <span class="toggle-collapsed" aria-hidden="true">&gt;&gt;</span>
+          <span class="toggle-label">Collapse</span>
+        </button>
+      </aside>
+
+      <main class="main-content">
+        <header class="top-panel">
+          <button
+            class="mobile-sidebar-toggle"
+            id="mobile-sidebar-toggle"
+            type="button"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
+            Menu
+          </button>
+
+          <form class="search-form" id="search-form">
+            <label for="search-input">Search Reddit media</label>
+            <div class="search-controls">
+              <input
+                id="search-input"
+                name="search"
+                type="search"
+                placeholder="Search images, videos, GIFs, or galleries"
+                autocomplete="off"
+              />
+              <button type="submit">Search</button>
+            </div>
+          </form>
+        </header>
+
+        <section class="controls-panel" aria-label="Media controls">
+          <div class="filter-group" role="group" aria-label="Media type filter">
+            <span class="control-label">Media:</span>
+            <button class="filter-button active" type="button" data-filter="all">
+              All
+            </button>
+            <button class="filter-button" type="button" data-filter="image">
+              Images
+            </button>
+            <button class="filter-button" type="button" data-filter="video">
+              Videos
+            </button>
+            <button class="filter-button" type="button" data-filter="gif">
+              GIFs
+            </button>
+          </div>
+
+          <label class="sort-control" for="sort-select">
+            <span class="control-label">Sort by:</span>
+            <select id="sort-select" name="sort">
+              <option value="relevance">Relevance</option>
+              <option value="new">New</option>
+              <option value="top">Top</option>
+              <option value="hot">Hot</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="results-section" aria-labelledby="results-title">
+          <div class="results-header">
+            <div>
+              <h1 id="results-title">Browse sample media</h1>
+              <p id="result-summary">6 sample results - 0 selected</p>
+            </div>
+            <p class="sort-summary" id="sort-summary">Sorted by Relevance</p>
+          </div>
+
+          <div class="media-grid" id="media-grid" aria-live="polite"></div>
+
+          <div class="empty-state" id="empty-state" hidden>
+            <h2>No matching media found</h2>
+            <p>Try choosing another media type filter.</p>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <script src="/app.js"></script>
   </body>

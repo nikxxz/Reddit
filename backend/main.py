@@ -8,7 +8,7 @@ from backend.config import settings
 from backend.routes.health import router as health_router
 from backend.routes.reddit import router as reddit_router
 
-app = FastAPI(title="Reddit Media Downloader")
+app = FastAPI(title=settings.app_name)
 
 app.include_router(health_router, prefix="/api")
 app.include_router(reddit_router, prefix="/api")
