@@ -116,6 +116,7 @@ export function MediaPreviewModal({ opened, item, onClose }) {
       subreddit: item.subreddit,
       author: item.author,
       title: item.title,
+      thumbnail_url: getThumbnailUrl(item),
       gallery_urls: galleryUrls,
       gallery_index: item.media_type === "gallery" ? activeGalleryIndex : null,
       download_scope: scope

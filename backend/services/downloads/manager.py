@@ -4,11 +4,19 @@ import asyncio
 import threading
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from time import monotonic
+from urllib.parse import urlsplit, urlunsplit
 
 from backend.config import settings
-from backend.models.downloads import DownloadRequest, DownloadStatusResponse, DownloadedFile
+from backend.models.downloads import (
+    DownloadJobFilter,
+    DownloadJobSummary,
+    DownloadRequest,
+    DownloadStatusResponse,
+    DownloadedFile,
+)
 from backend.services.downloads.direct import download_direct_url
 from backend.services.downloads.errors import DownloadCancelled, DownloadError
 from backend.services.downloads.gallery import download_gallery_urls
@@ -21,6 +29,17 @@ from backend.utils.logging import get_logger
 logger = get_logger(__name__)
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 NON_TERMINAL_STATUSES = {"queued", "resolving", "downloading", "merging"}
+ACTIVE_STATUSES = {"resolving", "downloading", "merging"}
+RETRYABLE_STATUSES = {"failed", "cancelled"}
+SUMMARY_ORDER = {
+    "resolving": 0,
+    "downloading": 0,
+    "merging": 0,
+    "queued": 1,
+    "failed": 2,
+    "completed": 3,
+    "cancelled": 4,
+}
 LEGAL_TRANSITIONS = {
     "queued": {"resolving", "downloading", "failed", "cancelled"},
     "resolving": {"downloading", "failed", "cancelled"},
@@ -47,6 +66,9 @@ class DownloadJob:
     cancel_event: threading.Event = field(default_factory=threading.Event)
     created_at: float = field(default_factory=monotonic)
     updated_at: float = field(default_factory=monotonic)
+    created_at_wall: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at_wall: datetime | None = None
+    completed_at_wall: datetime | None = None
     partial_paths: set[Path] = field(default_factory=set)
 
 
@@ -83,6 +105,13 @@ class DownloadJobManager:
             return None
         return self._response(job)
 
+    def list_jobs(self, status_filter: DownloadJobFilter = "all") -> list[DownloadJobSummary]:
+        self.cleanup_jobs()
+        with self.lock:
+            jobs = [job for job in self.jobs.values() if _matches_filter(job.status, status_filter)]
+            jobs.sort(key=lambda item: (SUMMARY_ORDER.get(item.status, 99), -item.created_at))
+            return [self._summary(job) for job in jobs]
+
     def cancel_job(self, job_id: str) -> DownloadStatusResponse | None:
         with self.lock:
             job = self.jobs.get(job_id)
@@ -92,6 +121,55 @@ class DownloadJobManager:
             job.cancel_event.set()
             self.transition_job(job, "cancelled", progress=None, message="Download cancelled", error=None)
         return self._response(job)
+
+    async def retry_job(self, job_id: str) -> DownloadJob | None:
+        started = monotonic()
+        logger.info("download.job.retry.start old_job_id=%s", job_id)
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                return None
+            if job.status not in RETRYABLE_STATUSES:
+                logger.warning(
+                    "download.job.retry.failed old_job_id=%s reason=not_retryable elapsed_ms=%s",
+                    job_id,
+                    int((monotonic() - started) * 1000),
+                )
+                raise DownloadError("Only failed or cancelled downloads can be retried.")
+            request = job.request.model_copy(deep=True)
+        new_job = await self.create_job(request)
+        logger.info(
+            "download.job.retry.success old_job_id=%s new_job_id=%s elapsed_ms=%s",
+            job_id,
+            new_job.job_id,
+            int((monotonic() - started) * 1000),
+        )
+        return new_job
+
+    def clear_terminal_jobs(self, statuses: set[str] | None = None) -> int:
+        started = monotonic()
+        requested = statuses or TERMINAL_STATUSES
+        removable = requested & TERMINAL_STATUSES
+        removed = 0
+        logger.info("download.jobs.clear.start status_filters=%s", ",".join(sorted(removable)))
+        try:
+            with self.lock:
+                for job_id, job in list(self.jobs.items()):
+                    if job.status in removable:
+                        del self.jobs[job_id]
+                        removed += 1
+            logger.info(
+                "download.jobs.clear.success removed=%s elapsed_ms=%s",
+                removed,
+                int((monotonic() - started) * 1000),
+            )
+            return removed
+        except Exception:
+            logger.exception(
+                "download.jobs.clear.failed elapsed_ms=%s",
+                int((monotonic() - started) * 1000),
+            )
+            raise
 
     def cleanup_jobs(self) -> dict[str, int]:
         started = monotonic()
@@ -166,6 +244,10 @@ class DownloadJobManager:
             for key, value in updates.items():
                 setattr(job, key, value)
             job.updated_at = monotonic()
+            if new_status in ACTIVE_STATUSES and job.started_at_wall is None:
+                job.started_at_wall = datetime.now(timezone.utc)
+            if new_status in TERMINAL_STATUSES:
+                job.completed_at_wall = datetime.now(timezone.utc)
             if new_status == "cancelled":
                 logger.info("download.job.cancelled job_id=%s", job.job_id)
             return True
@@ -370,6 +452,30 @@ class DownloadJobManager:
             total_bytes=job.total_bytes,
         )
 
+    def _summary(self, job: DownloadJob) -> DownloadJobSummary:
+        files = [DownloadedFile(**file) for file in job.files]
+        return DownloadJobSummary(
+            job_id=job.job_id,
+            post_id=job.request.post_id,
+            status=job.status,
+            progress=job.progress,
+            message=job.message,
+            media_type=job.request.media_type,
+            title=job.request.title,
+            subreddit=job.request.subreddit,
+            author=job.request.author,
+            thumbnail_url=_safe_public_url(job.request.thumbnail_url),
+            created_at=job.created_at_wall,
+            started_at=job.started_at_wall,
+            completed_at=job.completed_at_wall,
+            files=files,
+            error=job.error,
+            bytes_downloaded=job.bytes_downloaded,
+            total_bytes=job.total_bytes,
+            cancellable=job.status not in TERMINAL_STATUSES,
+            retryable=job.status in RETRYABLE_STATUSES,
+        )
+
 
 def _safe_error(error: Exception) -> str:
     if isinstance(error, DownloadError) and str(error):
@@ -382,6 +488,26 @@ def _safe_int(value: object) -> int | None:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _matches_filter(status: str, status_filter: DownloadJobFilter) -> bool:
+    if status_filter == "all":
+        return True
+    if status_filter == "active":
+        return status in ACTIVE_STATUSES
+    return status == status_filter
+
+
+def _safe_public_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
 
 
 download_job_manager = DownloadJobManager()

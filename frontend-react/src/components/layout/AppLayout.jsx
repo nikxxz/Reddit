@@ -1,7 +1,9 @@
 import { AppShell } from "@mantine/core";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { useState } from "react";
+import { DownloadsPage } from "../../pages/DownloadsPage";
 import { SearchPage } from "../../pages/SearchPage";
+import { useDownloads } from "../../hooks/useDownloads";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
@@ -16,6 +18,7 @@ export function AppLayout({
     useDisclosure(false);
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
   const [activeSection, setActiveSection] = useState("search");
+  const { activeJobCount } = useDownloads();
 
   const toggleNavbar = () => {
     if (isMobile) {
@@ -59,13 +62,14 @@ export function AppLayout({
           activeSection={activeSection}
           collapsed={!isMobile && !desktopOpened}
           connections={connections}
+          activeDownloadCount={activeJobCount}
           onSelectSection={handleSelectSection}
           redditAuth={redditAuth}
         />
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
-        <SearchPage />
+        {activeSection === "downloads" ? <DownloadsPage /> : <SearchPage />}
       </AppShell.Main>
     </AppShell>
   );

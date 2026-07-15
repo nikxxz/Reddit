@@ -1,0 +1,124 @@
+.downloads-page {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+}
+
+.downloads-toolbar {
+  width: 100%;
+}
+
+.downloads-filter-tabs {
+  max-width: 100%;
+}
+
+.downloads-filter-select {
+  display: none;
+  min-width: 180px;
+}
+
+.downloads-section-title {
+  letter-spacing: 0;
+}
+
+.download-job-card {
+  width: 100%;
+  overflow: hidden;
+}
+
+.download-job-card-grid {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.download-job-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 66px;
+  overflow: hidden;
+  background: var(--mantine-color-gray-0);
+  border: 1px solid var(--mantine-color-gray-2);
+  border-radius: 8px;
+}
+
+.download-job-thumb .mantine-Image-root,
+.download-job-thumb img {
+  width: 100%;
+  height: 100%;
+}
+
+.download-job-main,
+.download-job-title-group {
+  min-width: 0;
+}
+
+.download-job-actions {
+  min-width: 112px;
+}
+
+.download-job-progress {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.download-files-toggle {
+  width: fit-content;
+  color: var(--mantine-color-blue-7);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+}
+
+.downloads-empty-state {
+  background: var(--mantine-color-gray-0);
+}
+
+@media (max-width: 760px) {
+  .download-job-card-grid {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .download-job-thumb {
+    width: 64px;
+    height: 54px;
+  }
+
+  .download-job-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .downloads-toolbar {
+    align-items: stretch;
+  }
+
+  .downloads-filter-tabs {
+    display: none;
+  }
+
+  .downloads-filter-select {
+    display: block;
+    flex: 1 1 auto;
+  }
+
+  .download-job-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .download-job-thumb {
+    width: 56px;
+    height: 48px;
+  }
+
+  .download-job-progress {
+    grid-template-columns: 1fr;
+  }
+}

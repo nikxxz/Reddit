@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getBackendHealth } from "./api/healthApi";
 import { getRedditConnectionStatus } from "./api/redditApi";
 import { AppLayout } from "./components/layout/AppLayout";
+import { DownloadJobsProvider } from "./hooks/useDownloads";
 import { useRedditAuth } from "./hooks/useRedditAuth";
 import "./styles/app.css";
 import "./styles/account.css";
@@ -75,11 +76,13 @@ export default function App() {
   );
 
   return (
-    <AppLayout
-      connections={connections}
-      isChecking={isChecking}
-      onRetryConnections={handleRetry}
-      redditAuth={redditAuth}
-    />
+    <DownloadJobsProvider>
+      <AppLayout
+        connections={connections}
+        isChecking={isChecking}
+        onRetryConnections={handleRetry}
+        redditAuth={redditAuth}
+      />
+    </DownloadJobsProvider>
   );
 }

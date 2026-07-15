@@ -4,6 +4,7 @@ import {
   getDownloadStatus,
   startDownload
 } from "../api/downloadsApi";
+import { useDownloads } from "./useDownloads";
 
 const INITIAL_STATE = {
   jobId: null,
@@ -32,6 +33,7 @@ function normalizeStatus(data) {
 }
 
 export function useDownloadJob() {
+  const { refreshJobs } = useDownloads();
   const [state, setState] = useState(INITIAL_STATE);
   const stateRef = useRef(INITIAL_STATE);
   const pollTimerRef = useRef(null);
@@ -111,6 +113,7 @@ export function useDownloadJob() {
           message: "Queued..."
         };
         setState(nextState);
+        refreshJobs();
         beginPolling(response.job_id);
         pollStatus(response.job_id);
       } catch (error) {
@@ -123,7 +126,7 @@ export function useDownloadJob() {
         }
       }
     },
-    [beginPolling, pollStatus]
+    [beginPolling, pollStatus, refreshJobs]
   );
 
   const cancel = useCallback(async () => {
@@ -134,6 +137,7 @@ export function useDownloadJob() {
     try {
       const response = await cancelDownload(state.jobId);
       setState(normalizeStatus(response));
+      refreshJobs();
       stopPolling();
     } catch {
       setState((current) => ({
@@ -142,7 +146,7 @@ export function useDownloadJob() {
         error: "Unable to cancel download."
       }));
     }
-  }, [state.jobId, state.status, stopPolling]);
+  }, [refreshJobs, state.jobId, state.status, stopPolling]);
 
   const reset = useCallback(() => {
     stopPolling();

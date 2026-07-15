@@ -1,5 +1,6 @@
 import {
   Box,
+  Badge,
   Divider,
   NavLink,
   Stack,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
 ];
 
 export function AppSidebar({
+  activeDownloadCount = 0,
   activeSection,
   collapsed = false,
   connections,
@@ -58,10 +60,21 @@ export function AppSidebar({
           >
             <NavLink
               active={activeSection === item.value}
-              aria-label={item.label}
+              aria-label={
+                item.value === "downloads" && activeDownloadCount
+                  ? `${item.label}, ${activeDownloadCount} active`
+                  : item.label
+              }
               className={collapsed ? "sidebar-navlink-collapsed" : undefined}
               label={collapsed ? undefined : item.label}
               leftSection={<item.icon size={18} stroke={1.8} />}
+              rightSection={
+                item.value === "downloads" && activeDownloadCount ? (
+                  <Badge size="xs" variant="filled" aria-label={`${activeDownloadCount} active downloads`}>
+                    {activeDownloadCount}
+                  </Badge>
+                ) : undefined
+              }
               onClick={() => onSelectSection(item.value)}
               variant="light"
             />

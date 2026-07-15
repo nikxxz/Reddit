@@ -136,6 +136,8 @@ Gallery downloads may produce multiple files. Duplicate target filenames receive
 
 Download jobs are in memory. Completed jobs are retained for `DOWNLOAD_JOB_RETENTION_HOURS`; failed and cancelled jobs are retained for `FAILED_JOB_RETENTION_HOURS`. Cleanup removes only job metadata, never downloaded media.
 
+Retained jobs are available at `GET /api/downloads`. The response returns safe job summaries ordered by active jobs first, then queued, failed, completed, and cancelled jobs, newest first within each group. Failed and cancelled jobs can be retried with `POST /api/downloads/{job_id}/retry`; the retry creates a new job ID and keeps the old terminal job unchanged. Terminal metadata can be cleared with `DELETE /api/downloads/terminal` without deleting downloaded files.
+
 Before starting a new download, the backend checks free disk space under the configured download filesystem. If available space is below `MIN_FREE_DISK_GB`, the job is rejected with:
 
 ```text
