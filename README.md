@@ -1,89 +1,124 @@
 # Reddit Media Downloader
 
-A simple localhost web app for inspecting Reddit posts and preparing media downloads.
+A localhost FastAPI web app for checking a Reddit API connection and preparing Reddit media download workflows.
 
-## Technology stack
+## What is included
 
-- Frontend: Vanilla HTML, CSS, and JavaScript
-- Backend: Python 3.11+
-- API framework: FastAPI
-- Server: Uvicorn
-- Media downloads: yt-dlp
+- `backend/`: FastAPI app, routes, config, and Reddit service code.
+- `frontend/`: static HTML, CSS, and JavaScript served by FastAPI.
+- `downloads/`: local output folder for downloaded media.
+- `run.py`: local development server entry point.
+- `.env.example`: template for local configuration.
 
-## Project structure
+## Requirements
 
-```text
-reddit-media-downloader/
-├── backend/
-│   ├── __init__.py
-│   ├── main.py
-│   ├── config.py
-│   ├── models.py
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   └── health.py
-│   └── services/
-│       └── __init__.py
-├── frontend/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── downloads/
-│   └── .gitkeep
-├── .env.example
-├── .gitignore
-├── requirements.txt
-├── run.py
-└── README.md
+- Python 3.11 or newer
+- A Reddit app with a client ID, client secret, and user agent
+
+Install dependencies from `requirements.txt`:
+
+```powershell
+pip install -r requirements.txt
 ```
 
-## Python virtual environment
+## Setup
 
-### Windows PowerShell
+From the project directory:
 
 ```powershell
 cd E:\Dev\Python\Reddit
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-### macOS/Linux
+On macOS or Linux:
 
 ```bash
 cd /path/to/Reddit
 python3.11 -m venv .venv
 source .venv/bin/activate
-```
-
-## Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-## Configure environment
+## Configuration
 
-Copy the example environment file:
-
-### Windows PowerShell
+Copy the example file and fill in your Reddit app values:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-### macOS/Linux
+Expected `.env` keys:
 
-```bash
-cp .env.example .env
+```dotenv
+APP_HOST=127.0.0.1
+APP_PORT=8000
+DOWNLOAD_DIR=downloads
+DEBUG=true
+
+REDDIT_CLIENT_ID=your_client_id
+REDDIT_CLIENT_SECRET=your_client_secret
+REDDIT_USER_AGENT=windows:your-app-name:v0.1.0 (by /u/your_username)
 ```
 
-## Run the app
+Keep `.env` private. It is ignored by git and should not be committed or shared.
 
-```bash
+## Run the App
+
+With the virtual environment activated:
+
+```powershell
 python run.py
 ```
 
-Open:
+Then open:
 
-- http://127.0.0.1:8000
-- http://127.0.0.1:8000/api/health
+- Web app: http://127.0.0.1:8000
+- Health check: http://127.0.0.1:8000/api/health
+- Reddit connection test: http://127.0.0.1:8000/api/reddit/test
+
+When `DEBUG=true`, Uvicorn runs with reload enabled. That is useful for development, but use `DEBUG=false` if you want a single stable server process.
+
+## Test the Package
+
+Run a Python syntax/import check:
+
+```powershell
+.\.venv\Scripts\python.exe -m compileall backend run.py
+```
+
+Test local configuration without printing secrets:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from backend.config import settings; settings.validate_reddit_settings(); print('Reddit config values are present')"
+```
+
+Test the Reddit API connection directly:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from backend.services.reddit_service import RedditService; print(RedditService().test_connection())"
+```
+
+Expected successful result:
+
+```python
+{'connected': True, 'read_only': True, 'authenticated_user': None}
+```
+
+You can also test through the running HTTP server:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+Invoke-RestMethod http://127.0.0.1:8000/api/reddit/test
+```
+
+## API Behavior
+
+The current Reddit test uses a read-only PRAW client and fetches one item from `r/python` with `limit=1`. The frontend calls `/api/reddit/test` once on page load, so normal use should not generate repeated Reddit API calls.
+
+## Troubleshooting
+
+- `Missing Reddit configuration values`: check that `.env` exists and all `REDDIT_*` keys are filled in.
+- `Reddit API connection failed`: verify the client ID, client secret, user agent, and network access.
+- Port already in use: change `APP_PORT` in `.env`, then restart the app.
