@@ -13,6 +13,7 @@ from backend.config import settings
 from backend.models.reddit import RedditMediaItem, RedditSearchResponse
 from backend.services.reddit.client import RedditClientProvider
 from backend.services.reddit.media_detector import get_value, normalize_subreddit_input
+from backend.services.reddit.media_cache import normalized_media_cache
 from backend.services.reddit.normalizer import normalize_submission
 from backend.utils.urls import (
     is_direct_gif,
@@ -331,6 +332,7 @@ class RedditSearchService:
                     stats.skipped_media_filter += 1
                     continue
                 seen_ids.add(item.id)
+                normalized_media_cache.set(item)
                 items.append(item)
                 stats.accepted += 1
                 if len(items) >= limit:

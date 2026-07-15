@@ -101,23 +101,8 @@ export function MediaPreviewModal({ opened, item, onClose }) {
       return null;
     }
 
-    const galleryUrls = getMediaUrls(item);
-    const mediaUrl =
-      scope === "gallery_current"
-        ? galleryUrls[activeGalleryIndex]
-        : item.media_url || getPrimaryMediaUrl(item);
-
     return {
       post_id: item.id,
-      media_type: item.media_type,
-      download_strategy: item.download_strategy,
-      media_url: mediaUrl,
-      post_url: redditUrl || item.post_url || item.permalink,
-      subreddit: item.subreddit,
-      author: item.author,
-      title: item.title,
-      thumbnail_url: getThumbnailUrl(item),
-      gallery_urls: galleryUrls,
       gallery_index: item.media_type === "gallery" ? activeGalleryIndex : null,
       download_scope: scope
     };

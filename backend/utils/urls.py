@@ -1,5 +1,5 @@
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunsplit
 
 
 DIRECT_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".avif")
@@ -27,7 +27,22 @@ def clean_url(url: Any) -> str | None:
     parsed = urlparse(cleaned)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return None
-    return cleaned
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
+
+
+def provider_for_url(url: str | None) -> str | None:
+    host = host_lower(url).lower()
+    if host == "i.imgur.com":
+        return "imgur"
+    if host in {"imgur.com", "www.imgur.com"}:
+        return "imgur"
+    if host in {"redgifs.com", "www.redgifs.com"}:
+        return "redgifs"
+    if host in {"streamable.com", "www.streamable.com"}:
+        return "streamable"
+    if host.endswith("redd.it") or host.endswith("reddit.com"):
+        return "reddit"
+    return None
 
 
 def url_path_lower(url: str | None) -> str:

@@ -1,6 +1,16 @@
 from pydantic import BaseModel
 
 
+class RedditGalleryItem(BaseModel):
+    index: int
+    media_id: str | None = None
+    media_type: str = "image"
+    url: str
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+
+
 class RedditConnectionStatus(BaseModel):
     connected: bool
     read_only: bool = True
@@ -20,6 +30,9 @@ class RedditMediaItem(BaseModel):
     thumbnail_url: str | None = None
     media_url: str | None = None
     media_urls: list[str] = []
+    gallery_items: list[RedditGalleryItem] = []
+    reddit_video: dict[str, str | int | None] | None = None
+    provider: str | None = None
     width: int | None = None
     height: int | None = None
     duration: int | None = None

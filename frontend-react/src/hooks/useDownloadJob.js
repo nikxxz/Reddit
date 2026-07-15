@@ -27,6 +27,7 @@ function normalizeStatus(data) {
     message: data.message || "",
     files: Array.isArray(data.files) ? data.files : [],
     error: data.error || null,
+    errorCode: data.error_code || null,
     bytesDownloaded: data.bytes_downloaded ?? null,
     totalBytes: data.total_bytes ?? null
   };

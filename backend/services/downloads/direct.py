@@ -7,12 +7,12 @@ from pathlib import Path
 from time import monotonic
 from time import sleep
 from typing import Callable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
 from backend.config import settings
-from backend.services.downloads.errors import DownloadCancelled, DownloadError, UrlSafetyError
+from backend.services.downloads.errors import DownloadCancelled, DownloadError, MediaResolutionError, UrlSafetyError
 from backend.services.downloads.filenames import safe_filename_from_url, unique_path
 
 
@@ -38,22 +38,24 @@ ALLOWED_CONTENT_TYPES = {"application/octet-stream"}
 def validate_download_url(url: str, allowed_hosts: set[str] | None = None) -> None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise UrlSafetyError("Unsupported URL scheme.")
+        raise UrlSafetyError("invalid_url", "The media URL is invalid.")
+    if parsed.username or parsed.password:
+        raise UrlSafetyError("unsafe_url", "The media URL was rejected for safety reasons.")
 
     hostname = parsed.hostname.lower()
     hosts = allowed_hosts or ALLOWED_DIRECT_HOSTS
     if hosts and not any(hostname == host or hostname.endswith(f".{host}") for host in hosts):
-        raise UrlSafetyError("Unsupported download host.")
+        raise UrlSafetyError("unsupported_host", "Downloads from this media host are not supported.")
 
     try:
         addresses = socket.getaddrinfo(hostname, None)
     except socket.gaierror as exc:
-        raise UrlSafetyError("The media URL is no longer available.") from exc
+        raise UrlSafetyError("invalid_url", "The media URL is invalid.") from exc
 
     for address in addresses:
         ip = ipaddress.ip_address(address[4][0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-            raise UrlSafetyError("Unsupported download host.")
+            raise UrlSafetyError("unsafe_url", "The media URL was rejected for safety reasons.")
 
 
 def download_direct_url(
@@ -128,30 +130,41 @@ def _stream_to_file(
     cancel_event: threading.Event | None,
 ) -> Path:
     bytes_written = 0
-    with httpx.stream("GET", url, timeout=timeout, follow_redirects=True) as response:
-        response.raise_for_status()
-        content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
-        if not _valid_content_type(content_type):
-            raise DownloadError("The selected media could not be resolved.")
-        content_length = _safe_int(response.headers.get("content-length"))
-        if max_size_bytes is not None and content_length and content_length > max_size_bytes:
-            raise DownloadError("The selected media is too large.")
-        with part_path.open("wb") as file:
-            for chunk in response.iter_bytes():
-                if cancel_event and cancel_event.is_set():
-                    raise DownloadCancelled("The download was cancelled.")
-                if monotonic() > deadline:
-                    raise httpx.TimeoutException("download total timeout exceeded")
-                if not chunk:
-                    continue
-                bytes_written += len(chunk)
-                if max_size_bytes is not None and bytes_written > max_size_bytes:
-                    raise DownloadError("The selected media is too large.")
-                file.write(chunk)
-                if progress_callback:
-                    progress_callback(bytes_written, content_length)
-    part_path.replace(final_path)
-    return final_path
+    current_url = url
+    for _ in range(6):
+        validate_download_url(current_url)
+        with httpx.stream("GET", current_url, timeout=timeout, follow_redirects=False) as response:
+            status_code = getattr(response, "status_code", getattr(getattr(response, "response", None), "status_code", 200))
+            if status_code in {301, 302, 303, 307, 308}:
+                location = response.headers.get("location")
+                if not location:
+                    raise UrlSafetyError("invalid_url", "The media URL is invalid.")
+                current_url = urljoin(current_url, location)
+                continue
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
+            if not _valid_content_type(content_type):
+                raise MediaResolutionError("unsupported_media_type")
+            content_length = _safe_int(response.headers.get("content-length"))
+            if max_size_bytes is not None and content_length and content_length > max_size_bytes:
+                raise DownloadError("The selected media is too large.")
+            with part_path.open("wb") as file:
+                for chunk in response.iter_bytes():
+                    if cancel_event and cancel_event.is_set():
+                        raise DownloadCancelled("The download was cancelled.")
+                    if monotonic() > deadline:
+                        raise httpx.TimeoutException("download total timeout exceeded")
+                    if not chunk:
+                        continue
+                    bytes_written += len(chunk)
+                    if max_size_bytes is not None and bytes_written > max_size_bytes:
+                        raise DownloadError("The selected media is too large.")
+                    file.write(chunk)
+                    if progress_callback:
+                        progress_callback(bytes_written, content_length)
+            part_path.replace(final_path)
+            return final_path
+    raise UrlSafetyError("unsafe_url", "The media URL was rejected for safety reasons.")
 
 
 def _valid_content_type(content_type: str) -> bool:

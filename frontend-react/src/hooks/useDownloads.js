@@ -39,6 +39,7 @@ function normalizeJob(job) {
     completedAt: job.completed_at || null,
     files: Array.isArray(job.files) ? job.files : [],
     error: job.error || null,
+    errorCode: job.error_code || null,
     bytesDownloaded: job.bytes_downloaded ?? null,
     totalBytes: job.total_bytes ?? null,
     cancellable: Boolean(job.cancellable),

@@ -85,6 +85,7 @@ export function DownloadJobCard({
           {job.message ? (
             <Text size="sm" c={job.status === "failed" ? "red.7" : "gray.7"} role={job.status === "failed" ? "alert" : undefined}>
               {job.error || job.message}
+              {job.errorCode ? ` (${job.errorCode})` : ""}
             </Text>
           ) : null}
 

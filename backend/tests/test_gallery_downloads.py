@@ -8,8 +8,8 @@ from backend.services.downloads.gallery import download_gallery_urls
 from backend.services.downloads.resolver import resolve_download_request
 
 
-class GalleryDownloadTests(unittest.TestCase):
-    def test_current_item_resolution(self):
+class GalleryDownloadTests(unittest.IsolatedAsyncioTestCase):
+    async def test_current_item_resolution(self):
         request = DownloadRequest(
             post_id="abc123",
             media_type="gallery",
@@ -24,11 +24,11 @@ class GalleryDownloadTests(unittest.TestCase):
             download_scope="gallery_current",
         )
         with patch("backend.services.downloads.resolver.validate_download_url"):
-            resolved = resolve_download_request(request)
+            resolved = await resolve_download_request(request)
         self.assertEqual(resolved.urls, ["https://i.redd.it/two.jpg"])
         self.assertTrue(resolved.filenames[0].endswith("_02.jpg"))
 
-    def test_entire_gallery_resolution(self):
+    async def test_entire_gallery_resolution(self):
         request = DownloadRequest(
             post_id="abc123",
             media_type="gallery",
@@ -39,7 +39,7 @@ class GalleryDownloadTests(unittest.TestCase):
             download_scope="gallery_all",
         )
         with patch("backend.services.downloads.resolver.validate_download_url"):
-            resolved = resolve_download_request(request)
+            resolved = await resolve_download_request(request)
         self.assertEqual(len(resolved.urls), 2)
         self.assertTrue(resolved.filenames[0].endswith("_01.jpg"))
         self.assertTrue(resolved.filenames[1].endswith("_02.jpg"))

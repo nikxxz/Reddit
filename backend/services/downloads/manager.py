@@ -18,9 +18,10 @@ from backend.models.downloads import (
     DownloadedFile,
 )
 from backend.services.downloads.direct import download_direct_url
-from backend.services.downloads.errors import DownloadCancelled, DownloadError
+from backend.services.downloads.errors import DownloadCancelled, DownloadError, MediaResolutionError
 from backend.services.downloads.gallery import download_gallery_urls
-from backend.services.downloads.resolver import resolve_download_request
+from backend.services.downloads.resolver import RETRYABLE_RESOLUTION_CODES, resolve_download_request
+from backend.services.reddit.media_cache import normalized_media_cache
 from backend.services.downloads.yt_dlp_service import download_with_yt_dlp, ffmpeg_available
 from backend.services.system import PART_SUFFIX, cleanup_stale_part_files, has_minimum_free_space
 from backend.utils.logging import get_logger
@@ -61,6 +62,7 @@ class DownloadJob:
     filename: str | None = None
     files: list[dict[str, object]] = field(default_factory=list)
     error: str | None = None
+    error_code: str | None = None
     bytes_downloaded: int | None = None
     total_bytes: int | None = None
     cancel_event: threading.Event = field(default_factory=threading.Event)
@@ -137,6 +139,9 @@ class DownloadJobManager:
                 )
                 raise DownloadError("Only failed or cancelled downloads can be retried.")
             request = job.request.model_copy(deep=True)
+            if job.error_code in RETRYABLE_RESOLUTION_CODES:
+                normalized_media_cache.invalidate(request.post_id)
+                request.force_hydrate = True
         new_job = await self.create_job(request)
         logger.info(
             "download.job.retry.success old_job_id=%s new_job_id=%s elapsed_ms=%s",
@@ -263,7 +268,14 @@ class DownloadJobManager:
             try:
                 if not self.transition_job(job, "resolving", message="Preparing media..."):
                     return
-                resolved = resolve_download_request(job.request)
+                resolved = await resolve_download_request(
+                    job.request,
+                    force_hydrate=job.request.force_hydrate,
+                    job_id=job.job_id,
+                )
+                if job.cancel_event.is_set() or job.status in TERMINAL_STATUSES:
+                    self._mark_cancelled(job)
+                    return
                 resolved.output_dir.mkdir(parents=True, exist_ok=True)
                 job.partial_paths = {
                     (resolved.output_dir / filename).with_suffix(Path(filename).suffix + PART_SUFFIX)
@@ -294,6 +306,7 @@ class DownloadJobManager:
                     "failed",
                     progress=None,
                     error=_safe_error(exc),
+                    error_code=_error_code(exc),
                     message="Download failed",
                 )
                 logger.warning(
@@ -448,6 +461,7 @@ class DownloadJobManager:
             filename=job.filename,
             files=files,
             error=job.error,
+            error_code=job.error_code,
             bytes_downloaded=job.bytes_downloaded,
             total_bytes=job.total_bytes,
         )
@@ -470,6 +484,7 @@ class DownloadJobManager:
             completed_at=job.completed_at_wall,
             files=files,
             error=job.error,
+            error_code=job.error_code,
             bytes_downloaded=job.bytes_downloaded,
             total_bytes=job.total_bytes,
             cancellable=job.status not in TERMINAL_STATUSES,
@@ -478,9 +493,15 @@ class DownloadJobManager:
 
 
 def _safe_error(error: Exception) -> str:
+    if isinstance(error, MediaResolutionError):
+        return error.safe_message
     if isinstance(error, DownloadError) and str(error):
         return str(error)
     return "The selected media could not be downloaded."
+
+
+def _error_code(error: Exception) -> str | None:
+    return getattr(error, "error_code", None)
 
 
 def _safe_int(value: object) -> int | None:
