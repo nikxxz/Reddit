@@ -22,6 +22,10 @@ def direct_image_submission():
     return submission(url="https://i.redd.it/example.jpg", thumbnail="self")
 
 
+def avif_image_submission():
+    return submission(url="https://i.redd.it/example.avif", thumbnail="self")
+
+
 def reddit_video_submission():
     return submission(
         is_video=True,
@@ -38,6 +42,14 @@ def reddit_video_submission():
 
 def gif_submission():
     return submission(url="https://i.redd.it/loop.gif")
+
+
+def direct_video_submission():
+    return submission(url="https://i.redd.it/clip.mp4")
+
+
+def external_submission():
+    return submission(url="https://redgifs.com/watch/example", thumbnail="https://example.com/thumb.jpg")
 
 
 def gallery_submission():
@@ -59,6 +71,14 @@ def gallery_submission():
 
 def text_submission():
     return submission(url="https://www.reddit.com/r/pics/comments/abc123/")
+
+
+def poll_submission():
+    return submission(url="https://www.reddit.com/r/pics/comments/poll/", poll_data={"options": []})
+
+
+def nsfw_submission():
+    return submission(id="nsfw123", url="https://i.redd.it/nsfw.jpg", over_18=True)
 
 
 def deleted_author_submission():

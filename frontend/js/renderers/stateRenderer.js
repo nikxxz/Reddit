@@ -14,6 +14,7 @@ export function renderSearchState(elements, state, visibleItems) {
   elements.loadMoreRow.hidden =
     !state.hasSearched || state.loading || Boolean(state.error) || !state.nextAfter;
   elements.loadMoreButton.disabled = state.loading;
+  elements.searchButton.disabled = state.loading;
 }
 
 

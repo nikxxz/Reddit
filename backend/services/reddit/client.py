@@ -29,6 +29,12 @@ class RedditClientProvider:
                 client_secret=self.client_secret,
                 user_agent=self.user_agent,
                 check_for_updates=False,
+                requestor_kwargs={
+                    "timeout": (
+                        settings.reddit_connect_timeout,
+                        settings.reddit_read_timeout,
+                    )
+                },
             )
             try:
                 reddit.read_only = True

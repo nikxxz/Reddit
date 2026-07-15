@@ -50,6 +50,7 @@ def search_reddit_media(
     time_filter: str = Query(default="all"),
     limit: int = Query(default=24),
     after: str | None = Query(default=None),
+    include_nsfw: bool = Query(default=False),
     service: RedditSearchService = Depends(get_reddit_search_service),
 ) -> RedditSearchResponse:
     query, clean_subreddit = validate_search_params(
@@ -57,7 +58,7 @@ def search_reddit_media(
     )
     logger.info(
         "api.reddit.search.start query=%r subreddit=%s media_type=%s sort=%s "
-        "time_filter=%s limit=%s after=%s",
+        "time_filter=%s limit=%s after=%s include_nsfw=%s",
         query,
         clean_subreddit or "all",
         media_type,
@@ -65,6 +66,7 @@ def search_reddit_media(
         time_filter,
         limit,
         bool(after),
+        include_nsfw,
     )
     try:
         response = service.search_media(
@@ -75,6 +77,7 @@ def search_reddit_media(
             time_filter=time_filter,
             limit=limit,
             after=after,
+            include_nsfw=include_nsfw,
         )
         logger.info(
             "api.reddit.search.success query=%r count=%s next_after=%s",

@@ -10,7 +10,9 @@
 }
 
 .filter-group,
-.sort-control {
+.sort-control,
+.secondary-controls,
+.nsfw-switch {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -40,4 +42,75 @@
 
 .sort-control select {
   padding: 0.45rem 0.65rem;
+}
+
+.nsfw-switch {
+  cursor: pointer;
+}
+
+.nsfw-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 64px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.switch-thumb {
+  position: absolute;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-fast);
+}
+
+.switch-text {
+  position: absolute;
+}
+
+.switch-off {
+  right: 8px;
+}
+
+.switch-on {
+  left: 9px;
+  opacity: 0;
+}
+
+.nsfw-switch input:checked + .switch-track {
+  background: #991b1b;
+  border-color: #b91c1c;
+  color: #ffffff;
+}
+
+.nsfw-switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(34px);
+}
+
+.nsfw-switch input:checked + .switch-track .switch-off {
+  opacity: 0;
+}
+
+.nsfw-switch input:checked + .switch-track .switch-on {
+  opacity: 1;
+}
+
+.nsfw-switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }

@@ -20,5 +20,9 @@ export function searchRedditMedia(params) {
   if (params.after) {
     searchParams.set("after", params.after);
   }
-  return requestJson(`/api/reddit/search?${searchParams.toString()}`);
+  searchParams.set("include_nsfw", String(Boolean(params.includeNsfw)));
+  return requestJson(`/api/reddit/search?${searchParams.toString()}`, {
+    signal: params.signal,
+    timeoutMs: params.timeoutMs || 25000,
+  });
 }

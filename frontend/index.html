@@ -104,7 +104,7 @@
                   placeholder="Subreddit, e.g. wallpapers"
                   autocomplete="off"
                 />
-                <button type="submit">Search</button>
+                <button type="submit" id="search-button">Search</button>
               </div>
             </form>
           </header>
@@ -116,18 +116,30 @@
               <button class="filter-button" type="button" data-filter="image">Images</button>
               <button class="filter-button" type="button" data-filter="video">Videos</button>
               <button class="filter-button" type="button" data-filter="gif">GIFs</button>
+              <button class="filter-button" type="button" data-filter="gallery">Gallery</button>
             </div>
 
-            <label class="sort-control" for="sort-select">
-              <span class="control-label">Sort by:</span>
-              <select id="sort-select" name="sort">
-                <option value="relevance">Relevance</option>
-                <option value="new">New</option>
-                <option value="top">Top</option>
-                <option value="hot">Hot</option>
-                <option value="comments">Comments</option>
-              </select>
-            </label>
+            <div class="secondary-controls">
+              <label class="nsfw-switch" for="include-nsfw-toggle">
+                <span class="control-label">NSFW</span>
+                <input id="include-nsfw-toggle" type="checkbox" aria-label="Include NSFW content" />
+                <span class="switch-track" aria-hidden="true">
+                  <span class="switch-thumb"></span>
+                  <span class="switch-text switch-off">OFF</span>
+                  <span class="switch-text switch-on">ON</span>
+                </span>
+              </label>
+
+              <label class="sort-control" for="sort-select">
+                <span class="control-label">Sort by:</span>
+                <select id="sort-select" name="sort">
+                  <option value="relevance">Relevance</option>
+                  <option value="new">New</option>
+                  <option value="top">Top</option>
+                  <option value="hot">Hot</option>
+                </select>
+              </label>
+            </div>
           </section>
 
           <section class="results-section" aria-labelledby="results-title">

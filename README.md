@@ -1,6 +1,6 @@
 # Reddit Media Downloader
 
-A localhost FastAPI web app for searching Reddit media through a read-only PRAW client. Downloading is intentionally not implemented yet.
+A localhost FastAPI web app for searching Reddit media through a read-only PRAW client. Search uses Reddit only for discovery and metadata; media transfer is handled by direct URLs or `yt-dlp` service modules.
 
 ## Project Structure
 
@@ -9,6 +9,7 @@ backend/
   api/                 FastAPI dependencies, safe error types, shared response text
   models/              Pydantic models split by common and Reddit-specific domains
   routes/              Thin HTTP route handlers
+  services/downloads/  Direct download, yt-dlp, filename, resolver, and safety helpers
   services/reddit/     Reddit client, connection checks, search, detection, normalization
   tests/               Backend unit tests and mocked Reddit submission fixtures
   utils/               Shared HTML, URL, and logging helpers
@@ -20,13 +21,13 @@ frontend/
 downloads/            Reserved local output folder
 ```
 
-Future downloader work should go into reserved domain modules such as:
+Download queue and history are intentionally still future work. Additional downloader behavior should stay in domain modules such as:
 
 - `backend/services/downloads/`
 - `backend/routes/downloads.py`
 - `backend/models/downloads.py`
 
-Do not add `yt-dlp`, FFmpeg, or download queue behavior outside those future downloader modules.
+Do not add FFmpeg orchestration or download queue behavior outside those future downloader modules.
 
 ## Backend Responsibilities
 
@@ -38,6 +39,7 @@ Do not add `yt-dlp`, FFmpeg, or download queue behavior outside those future dow
 - `backend/services/reddit/search.py`: executes Reddit searches, paginates where possible, filters normalized media, and returns response models.
 - `backend/services/reddit/media_detector.py`: contains media-type constants and detection rules.
 - `backend/services/reddit/normalizer.py`: converts PRAW submission-like objects into stable `RedditMediaItem` models.
+- `backend/services/downloads/`: validates URLs, streams direct media to `.part` files, chooses download strategy, and wraps `yt-dlp`.
 
 ## Frontend Responsibilities
 
@@ -79,6 +81,16 @@ APP_PORT=8000
 APP_NAME=Reddit Media Downloader
 DOWNLOAD_DIR=downloads
 DEBUG=true
+REDDIT_CONNECT_TIMEOUT=10
+REDDIT_READ_TIMEOUT=20
+MEDIA_CONNECT_TIMEOUT=10
+MEDIA_READ_TIMEOUT=60
+DOWNLOAD_TOTAL_TIMEOUT=300
+MAX_API_RETRIES=2
+MAX_DOWNLOAD_RETRIES=2
+SEARCH_LIMIT=24
+SEARCH_FETCH_MULTIPLIER=3
+MAX_CONCURRENT_DOWNLOADS=2
 
 REDDIT_USERNAME=your_username
 REDDIT_CLIENT_ID=your_client_id
@@ -110,13 +122,14 @@ Supported query parameters:
 
 - `q` required
 - `subreddit` optional, without `r/`
-- `media_type`: `all`, `image`, `video`, `gif`, `gallery`
-- `sort`: `relevance`, `hot`, `top`, `new`, `comments`
+- `media_type`: `all`, `image`, `video`, `gif`, `gallery`, `external`
+- `sort`: `relevance`, `hot`, `top`, `new`
 - `time_filter`: `hour`, `day`, `week`, `month`, `year`, `all`
 - `limit`: 1 to 50
 - `after`: optional Reddit listing cursor
+- `include_nsfw`: `false` by default; `true` includes NSFW posts Reddit normally returns to this API client
 
-The response returns normalized media items only and never exposes raw PRAW objects or credentials.
+The response returns normalized media items only and never exposes raw PRAW objects or credentials. Search normalization uses already-loaded listing fields and does not intentionally access comment trees or hydrate each submission.
 
 ## Tests
 

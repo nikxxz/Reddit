@@ -66,6 +66,7 @@
 }
 
 .media-badge,
+.nsfw-badge,
 .select-wrap {
   position: absolute;
   z-index: 2;
@@ -81,6 +82,17 @@
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.nsfw-badge {
+  left: 0.65rem;
+  top: 2.7rem;
+  border-radius: 999px;
+  background: rgba(153, 27, 27, 0.88);
+  color: #ffffff;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .select-wrap {

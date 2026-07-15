@@ -41,6 +41,10 @@ export function createMediaCard(item, options) {
   badge.className = "media-badge";
   badge.textContent = item.media_type;
 
+  const nsfwBadge = document.createElement("span");
+  nsfwBadge.className = "nsfw-badge";
+  nsfwBadge.textContent = "NSFW";
+
   const selectWrap = document.createElement("label");
   selectWrap.className = "select-wrap";
   selectWrap.setAttribute("title", `Select ${item.title}`);
@@ -85,7 +89,11 @@ export function createMediaCard(item, options) {
 
   selectWrap.appendChild(checkbox);
   renderThumbnail(thumbnail, item);
-  thumbnail.append(badge, selectWrap);
+  thumbnail.append(badge);
+  if (item.is_nsfw) {
+    thumbnail.append(nsfwBadge);
+  }
+  thumbnail.append(selectWrap);
   meta.append(mediaType, detail);
   footnote.append(author, createdAt);
   body.append(title, subreddit, meta, footnote);

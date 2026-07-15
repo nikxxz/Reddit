@@ -3,8 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from backend.models.reddit import RedditMediaItem
-from backend.services.reddit.media_detector import get_value, reddit_video
-from backend.utils.urls import clean_url, is_direct_gif, is_direct_image, is_gifv
+from backend.services.reddit.media_detector import get_loaded_value, get_value, reddit_video
+from backend.utils.urls import (
+    clean_url,
+    is_direct_gif,
+    is_direct_image,
+    is_direct_video,
+    is_gifv,
+    is_known_external_media_url,
+    is_reddit_video_url,
+)
 
 PLACEHOLDER_THUMBNAILS = {"", "self", "default", "nsfw", "spoiler", "image"}
 
@@ -87,6 +95,8 @@ def base_item(
     duration: int | None = None,
     is_gallery: bool = False,
     gallery_count: int = 0,
+    media_urls: list[str] | None = None,
+    download_strategy: str = "unsupported",
 ) -> RedditMediaItem:
     return RedditMediaItem(
         id=str(get_value(submission, "id") or ""),
@@ -99,12 +109,14 @@ def base_item(
         media_type=media_type,
         thumbnail_url=thumbnail_url,
         media_url=media_url,
+        media_urls=media_urls or [],
         width=width,
         height=height,
         duration=duration,
         is_gallery=is_gallery,
         gallery_count=gallery_count,
         is_nsfw=bool(get_value(submission, "over_18", False)),
+        download_strategy=download_strategy,
     )
 
 
@@ -117,6 +129,8 @@ def extract_image_media(submission: Any) -> RedditMediaItem | None:
         "image",
         url,
         preview_image_url(submission) or valid_thumbnail(submission) or url,
+        media_urls=[url],
+        download_strategy="direct",
     )
 
 
@@ -129,6 +143,8 @@ def extract_gif_media(submission: Any) -> RedditMediaItem | None:
         "gif",
         url,
         preview_image_url(submission) or valid_thumbnail(submission),
+        media_urls=[url],
+        download_strategy="direct",
     )
 
 
@@ -136,10 +152,13 @@ def extract_video_media(submission: Any) -> RedditMediaItem | None:
     video = reddit_video(submission)
     url = clean_url(get_value(video, "fallback_url")) if video else None
     direct_url = clean_url(get_value(submission, "url"))
-    if not url and is_gifv(direct_url):
+    if not url and (is_gifv(direct_url) or is_direct_video(direct_url)):
+        url = direct_url
+    if not url and is_reddit_video_url(direct_url):
         url = direct_url
     if not url and not bool(get_value(submission, "is_video", False)):
         return None
+    strategy = "yt_dlp" if bool(get_value(submission, "is_video", False)) or is_reddit_video_url(direct_url) else "direct"
     return base_item(
         submission,
         "video",
@@ -148,6 +167,8 @@ def extract_video_media(submission: Any) -> RedditMediaItem | None:
         width=safe_int(get_value(video, "width")) if video else None,
         height=safe_int(get_value(video, "height")) if video else None,
         duration=safe_int(get_value(video, "duration")) if video else None,
+        media_urls=[url or direct_url] if url or direct_url else [],
+        download_strategy=strategy,
     )
 
 
@@ -169,6 +190,12 @@ def extract_gallery_media(submission: Any) -> RedditMediaItem | None:
         first_meta = next(iter(media_metadata.values()))
 
     source = get_value(first_meta, "s") or {}
+    media_urls = []
+    for item_meta in media_metadata.values() if isinstance(media_metadata, dict) else []:
+        item_source = get_value(item_meta, "s") or {}
+        item_url = clean_url(get_value(item_source, "u") or get_value(item_source, "gif"))
+        if item_url:
+            media_urls.append(item_url)
     media_url = clean_url(get_value(source, "u") or get_value(source, "gif"))
     thumbnail = preview_image_url(submission) or gallery_preview_url(first_meta)
     count = len(gallery_items) if gallery_items else len(media_metadata)
@@ -184,11 +211,23 @@ def extract_gallery_media(submission: Any) -> RedditMediaItem | None:
         height=safe_int(get_value(source, "y")),
         is_gallery=True,
         gallery_count=count,
+        media_urls=media_urls,
+        download_strategy="direct" if media_urls or media_url else "resolve_details",
     )
 
 
 def extract_external_media(submission: Any) -> RedditMediaItem | None:
-    return extract_gif_media(submission) or extract_image_media(submission)
+    url = clean_url(get_value(submission, "url"))
+    if not is_known_external_media_url(url):
+        return None
+    return base_item(
+        submission,
+        "external",
+        url,
+        preview_image_url(submission) or valid_thumbnail(submission),
+        media_urls=[],
+        download_strategy="yt_dlp",
+    )
 
 
 def crosspost_source(submission: Any) -> Any | None:
@@ -205,6 +244,8 @@ def copy_item(item: RedditMediaItem, updates: dict[str, Any]) -> RedditMediaItem
 
 
 def normalize_submission(submission: Any) -> RedditMediaItem | None:
+    if bool(get_loaded_value(submission, "is_poll", False)) or get_loaded_value(submission, "poll_data"):
+        return None
     item = (
         extract_gallery_media(submission)
         or extract_video_media(submission)

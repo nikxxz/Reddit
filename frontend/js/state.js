@@ -8,6 +8,8 @@ export const state = {
   selectedIds: new Set(),
   searchQuery: "",
   subreddit: "",
+  includeNsfw: false,
+  activeSearchController: null,
   items: [],
   nextAfter: null,
   loading: false,

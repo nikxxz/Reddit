@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import sleep
 from time import perf_counter
 from typing import Any
 
@@ -8,6 +9,7 @@ from praw.exceptions import PRAWException
 from prawcore import exceptions as prawcore_exceptions
 
 from backend.api.errors import InvalidSubredditError, RedditSearchError
+from backend.config import settings
 from backend.models.reddit import RedditMediaItem, RedditSearchResponse
 from backend.services.reddit.client import RedditClientProvider
 from backend.services.reddit.media_detector import get_value
@@ -26,6 +28,7 @@ class SearchCollectionStats:
     skipped_missing_id: int = 0
     skipped_duplicate: int = 0
     skipped_media_filter: int = 0
+    skipped_nsfw: int = 0
 
 
 class RedditSearchService:
@@ -41,6 +44,7 @@ class RedditSearchService:
         time_filter: str = "all",
         limit: int = 24,
         after: str | None = None,
+        include_nsfw: bool = False,
     ) -> RedditSearchResponse:
         query = query.strip()
         subreddit = subreddit.strip() if subreddit else None
@@ -48,10 +52,10 @@ class RedditSearchService:
             subreddit = subreddit[2:]
 
         started_at = perf_counter()
-        inspect_limit = min(max(limit * 3, 60), 100)
+        inspect_limit = min(max(limit * settings.search_fetch_multiplier, 60), 100)
         logger.info(
             "reddit.search.start query=%r subreddit=%s media_type=%s sort=%s "
-            "time_filter=%s limit=%s inspect_limit=%s after=%s",
+            "time_filter=%s limit=%s inspect_limit=%s after=%s include_nsfw=%s",
             query,
             subreddit or "all",
             media_type,
@@ -60,6 +64,7 @@ class RedditSearchService:
             limit,
             inspect_limit,
             bool(after),
+            include_nsfw,
         )
 
         try:
@@ -72,13 +77,14 @@ class RedditSearchService:
                 after=after,
             )
             items, next_after, stats = self._collect_media_items(
-                listing, media_type, limit
+                listing, media_type, limit, include_nsfw
             )
             elapsed_ms = round((perf_counter() - started_at) * 1000)
             logger.info(
                 "reddit.search.success query=%r subreddit=%s inspected=%s accepted=%s "
                 "skipped_unsupported=%s skipped_missing_id=%s skipped_duplicate=%s "
-                "skipped_media_filter=%s next_after=%s elapsed_ms=%s",
+                "skipped_media_filter=%s skipped_nsfw=%s detail_hydration_requests=%s "
+                "next_after=%s elapsed_ms=%s",
                 query,
                 subreddit or "all",
                 stats.inspected,
@@ -87,6 +93,8 @@ class RedditSearchService:
                 stats.skipped_missing_id,
                 stats.skipped_duplicate,
                 stats.skipped_media_filter,
+                stats.skipped_nsfw,
+                0,
                 bool(next_after),
                 elapsed_ms,
             )
@@ -143,7 +151,7 @@ class RedditSearchService:
         limit: int,
         after: str | None,
     ) -> Any:
-        inspect_limit = min(max(limit * 3, 60), 100)
+        inspect_limit = min(max(limit * settings.search_fetch_multiplier, 60), 100)
         reddit = self.client_provider.get_client()
         target = reddit.subreddit(subreddit or "all")
         search_kwargs: dict[str, Any] = {
@@ -162,6 +170,24 @@ class RedditSearchService:
             inspect_limit,
             bool(after),
         )
+        last_error: Exception | None = None
+        for attempt in range(settings.max_api_retries + 1):
+            try:
+                return target.search(query, **search_kwargs)
+            except Exception as exc:
+                if not self._is_retryable_error(exc) or attempt >= settings.max_api_retries:
+                    raise
+                last_error = exc
+                delay = self._retry_delay(exc, attempt)
+                logger.warning(
+                    "reddit.search.retry attempt=%s delay_seconds=%s error_type=%s",
+                    attempt + 1,
+                    delay,
+                    exc.__class__.__name__,
+                )
+                sleep(delay)
+        if last_error:
+            raise last_error
         return target.search(query, **search_kwargs)
 
     def _collect_media_items(
@@ -169,6 +195,7 @@ class RedditSearchService:
         listing: Any,
         media_type: str,
         limit: int,
+        include_nsfw: bool,
     ) -> tuple[list[RedditMediaItem], str | None, SearchCollectionStats]:
         items: list[RedditMediaItem] = []
         seen_ids: set[str] = set()
@@ -186,6 +213,9 @@ class RedditSearchService:
                 item = normalize_submission(submission)
                 if not item:
                     stats.skipped_unsupported += 1
+                    continue
+                if item.is_nsfw and not include_nsfw:
+                    stats.skipped_nsfw += 1
                     continue
                 if not item.id:
                     stats.skipped_missing_id += 1
@@ -205,13 +235,14 @@ class RedditSearchService:
             logger.warning(
                 "reddit.search.collect_failure inspected=%s accepted=%s "
                 "skipped_unsupported=%s skipped_missing_id=%s skipped_duplicate=%s "
-                "skipped_media_filter=%s error_type=%s error=%s",
+                "skipped_media_filter=%s skipped_nsfw=%s error_type=%s error=%s",
                 stats.inspected,
                 stats.accepted,
                 stats.skipped_unsupported,
                 stats.skipped_missing_id,
                 stats.skipped_duplicate,
                 stats.skipped_media_filter,
+                stats.skipped_nsfw,
                 exc.__class__.__name__,
                 self.client_provider.sanitize_error(exc),
             )
@@ -221,3 +252,19 @@ class RedditSearchService:
         if len(items) >= limit:
             next_after = get_value(listing, "params", {}).get("after") or last_fullname
         return items, next_after, stats
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        if status in {429, 500, 502, 503, 504}:
+            return True
+        if status in {400, 401, 403, 404}:
+            return False
+        return isinstance(error, (TimeoutError, ConnectionError, prawcore_exceptions.RequestException))
+
+    def _retry_delay(self, error: Exception, attempt: int) -> float:
+        headers = getattr(getattr(error, "response", None), "headers", {}) or {}
+        retry_after = headers.get("Retry-After") if hasattr(headers, "get") else None
+        try:
+            return min(float(retry_after), 30.0)
+        except (TypeError, ValueError):
+            return float(2**attempt)

@@ -4,3 +4,4 @@ yt-dlp
 python-dotenv
 pydantic
 praw
+httpx

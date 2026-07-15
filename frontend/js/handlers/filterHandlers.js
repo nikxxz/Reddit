@@ -5,6 +5,7 @@ export function bindFilterHandlers(elements, actions) {
   });
 
   elements.sortSelect.addEventListener("change", actions.onSortChange);
+  elements.includeNsfwToggle.addEventListener("change", actions.onNsfwChange);
 }
 
 

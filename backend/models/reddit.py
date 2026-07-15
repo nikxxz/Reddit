@@ -19,12 +19,14 @@ class RedditMediaItem(BaseModel):
     media_type: str
     thumbnail_url: str | None = None
     media_url: str | None = None
+    media_urls: list[str] = []
     width: int | None = None
     height: int | None = None
     duration: int | None = None
     is_gallery: bool = False
     gallery_count: int = 0
     is_nsfw: bool = False
+    download_strategy: str = "unsupported"
 
 
 class RedditSearchResponse(BaseModel):
