@@ -31,7 +31,6 @@ export function MediaCard({ item, onOpen, compact = false }) {
       className={`media-card ${compact ? "media-card-compact" : ""}`}
       role="button"
       tabIndex={0}
-      withBorder
       onClick={() => onOpen(item)}
       onKeyDown={handleKeyDown}
     >

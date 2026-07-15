@@ -24,6 +24,9 @@
 .download-job-card {
   width: 100%;
   overflow: hidden;
+  background: var(--surface-raised);
+  border-color: var(--border);
+  border-radius: 16px;
 }
 
 .download-job-card-grid {
@@ -40,8 +43,8 @@
   width: 88px;
   height: 66px;
   overflow: hidden;
-  background: var(--mantine-color-gray-0);
-  border: 1px solid var(--mantine-color-gray-2);
+  background: var(--background);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 
@@ -69,13 +72,14 @@
 
 .download-files-toggle {
   width: fit-content;
-  color: var(--mantine-color-blue-7);
+  color: var(--mantine-color-teal-3);
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
 }
 
 .downloads-empty-state {
-  background: var(--mantine-color-gray-0);
+  background: var(--surface-raised);
+  border-color: var(--border);
 }
 
 @media (max-width: 760px) {

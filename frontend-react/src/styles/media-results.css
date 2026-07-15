@@ -1,8 +1,8 @@
 :root {
-  --media-card-radius: 12px;
+  --media-card-radius: 16px;
   --media-card-gap: 20px;
   --media-hover-duration: 160ms;
-  --media-stage-background: #111827;
+  --media-stage-background: #090a0b;
   --mobile-thumbnail-width: 124px;
 }
 
@@ -19,18 +19,19 @@
   min-width: 0;
   overflow: hidden;
   cursor: pointer;
-  background: var(--mantine-color-white);
+  background: var(--surface-raised);
   border-radius: var(--media-card-radius);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   transition:
     box-shadow var(--media-hover-duration) ease,
-    transform var(--media-hover-duration) ease,
-    border-color var(--media-hover-duration) ease;
+    transform var(--media-hover-duration) ease;
 }
 
 .media-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--mantine-color-blue-3);
-  box-shadow: var(--mantine-shadow-sm);
+  transform: translateY(-4px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.07) inset,
+    0 18px 46px rgba(0, 0, 0, 0.35);
 }
 
 .media-card:active {
@@ -47,7 +48,7 @@
   aspect-ratio: 4 / 3;
   min-width: 0;
   overflow: hidden;
-  background: var(--mantine-color-gray-1);
+  background: var(--media-stage-background);
 }
 
 .media-card-body {
@@ -62,6 +63,8 @@
 
 .media-card-meta {
   min-height: 16px;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
 }
 
 .media-card-badges {
@@ -85,7 +88,7 @@
 .media-thumbnail {
   position: relative;
   overflow: hidden;
-  background: var(--mantine-color-gray-1);
+  background: var(--media-stage-background);
 }
 
 .media-thumbnail-contain {
@@ -114,7 +117,7 @@
   height: 100%;
   min-height: 110px;
   padding: 12px;
-  background: color-mix(in srgb, var(--mantine-color-gray-1) 80%, white);
+  background: color-mix(in srgb, var(--surface) 78%, var(--background));
 }
 
 .media-preview-stage {
@@ -180,7 +183,7 @@
   justify-content: space-between;
   gap: 12px;
   padding-top: 8px;
-  border-top: 1px solid var(--mantine-color-gray-2);
+  border-top: 1px solid var(--border);
 }
 
 .media-preview-download-actions {

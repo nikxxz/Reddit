@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DownloadsPage } from "../../pages/DownloadsPage";
 import { SearchPage } from "../../pages/SearchPage";
 import { useDownloads } from "../../hooks/useDownloads";
+import { DownloadTray } from "../downloads/DownloadTray";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 
@@ -18,7 +19,7 @@ export function AppLayout({
     useDisclosure(false);
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(true);
   const [activeSection, setActiveSection] = useState("search");
-  const { activeJobCount } = useDownloads();
+  const { activeJobCount, jobs } = useDownloads();
 
   const toggleNavbar = () => {
     if (isMobile) {
@@ -76,6 +77,11 @@ export function AppLayout({
           <DownloadsPage />
         </div>
       </AppShell.Main>
+
+      <DownloadTray
+        jobs={jobs}
+        onOpenDownloads={() => handleSelectSection("downloads")}
+      />
     </AppShell>
   );
 }

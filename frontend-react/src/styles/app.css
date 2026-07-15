@@ -4,6 +4,17 @@
   background: var(--background);
 }
 
+.mantine-AppShell-header,
+.mantine-AppShell-navbar {
+  background: rgba(18, 20, 23, 0.92);
+  border-color: var(--border);
+  backdrop-filter: blur(18px);
+}
+
+.mantine-AppShell-main {
+  background: var(--background);
+}
+
 .app-title {
   overflow: hidden;
   max-width: 100%;
@@ -27,6 +38,22 @@
   padding-inline: 10px;
 }
 
+.mantine-NavLink-root {
+  border-radius: 12px;
+  color: var(--muted-text);
+}
+
+.mantine-NavLink-root:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mantine-NavLink-root[data-active] {
+  color: var(--mantine-color-teal-1);
+  background: rgba(34, 184, 166, 0.13);
+  box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.18);
+}
+
 .sidebar-navlink-collapsed .mantine-NavLink-section {
   margin-inline-end: 0;
 }
@@ -37,6 +64,29 @@
   justify-content: center;
   width: 28px;
   height: 28px;
+}
+
+.download-tray {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 210;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  color: var(--text);
+  background: rgba(23, 26, 29, 0.94);
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  border-radius: 16px;
+  box-shadow: var(--shadow-raised);
+  backdrop-filter: blur(18px);
+}
+
+.download-tray-icon-button {
+  color: var(--mantine-color-teal-1);
+}
+
+.download-tray-progress .mantine-Progress-section {
+  background: linear-gradient(90deg, var(--mantine-color-teal-6), var(--mantine-color-teal-3));
 }
 
 @keyframes status-pulse {
@@ -61,5 +111,13 @@
 @media (max-width: 374px) {
   .app-title {
     font-size: 1rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .download-tray {
+    right: 12px;
+    bottom: 12px;
+    width: calc(100vw - 24px);
   }
 }
