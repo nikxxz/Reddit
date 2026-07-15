@@ -1,6 +1,6 @@
 # Reddit Media Downloader
 
-A localhost FastAPI web app for searching Reddit media through a read-only PRAW client. Search uses Reddit only for discovery and metadata; media transfer is handled by direct URLs or `yt-dlp` service modules.
+A FastAPI + React web app for searching Reddit media through a read-only PRAW client. Search uses Reddit only for discovery and metadata; media transfer is handled by direct URLs or `yt-dlp` service modules.
 
 ## Project Structure
 
@@ -14,10 +14,10 @@ backend/
   tests/               Backend unit tests and mocked Reddit submission fixtures
   utils/               Shared HTML, URL, and logging helpers
 frontend/
-  index.html           Application shell and page containers
-  js/                  ES module frontend application code
-  styles/              CSS split by layout, sidebar, search, filters, cards, states, responsive
-  assets/              Static frontend assets
+  ...                  Legacy browser-native frontend kept for reference
+frontend-react/
+  src/                 Current React + Vite frontend source
+  dist/                Production build served by FastAPI after `npm.cmd run build`
 downloads/            Reserved local output folder
 ```
 
@@ -46,35 +46,36 @@ Do not add FFmpeg orchestration or download queue behavior outside those future 
 
 ## Frontend Responsibilities
 
-- `frontend/js/app.js`: small bootstrap that initializes state, pages, sidebar behavior, app config, and connection checks.
-- `frontend/js/state.js`: shared UI state.
-- `frontend/js/api/`: all frontend `fetch` calls.
-- `frontend/js/data/sampleMedia.js`: sample cards used only before a real search.
-- `frontend/js/handlers/`: event binding and coordination.
-- `frontend/js/renderers/`: DOM rendering for cards, grids, states, and connection status.
-- `frontend/js/pages/`: page controllers for search, connections, and placeholder pages.
-- `frontend/js/utils/`: URL, date, text, and DOM helpers.
+- `frontend-react/src/main.jsx`: React application entry point.
+- `frontend-react/src/App.jsx`: application shell and top-level data flow.
+- `frontend-react/src/api/`: all frontend `fetch` calls, using relative `/api/...` paths.
+- `frontend-react/src/hooks/`: search, OAuth, download, and media preview state.
+- `frontend-react/src/components/`: account, search, media, downloads, layout, and shared UI components.
+- `frontend-react/src/styles/`: app and feature CSS.
 
-The frontend uses browser-native ES modules and has no build step.
+The production frontend is the Vite build in `frontend-react/dist/`. FastAPI serves this build at `/` and serves static assets from `/assets`.
 
 ## Frontend Migration Status
 
-- `frontend/` contains the current production frontend.
-- `frontend-react/` contains the parallel React migration workspace.
-- FastAPI continues to serve `frontend/`.
-- Do not remove `frontend/` until React feature parity is verified.
+- `frontend-react/` is the current production frontend.
+- `frontend/` is the older browser-native frontend retained for reference during cleanup.
+- Run `npm.cmd run build` in `frontend-react/` before serving the production UI through FastAPI.
 
 ## Setup
 
 Requirements:
 
 - Python 3.11 or newer
+- Node.js and npm
 - A Reddit app with a client ID, client secret, and user agent
 
 Install dependencies:
 
 ```powershell
 pip install -r requirements.txt
+cd frontend-react
+npm install
+cd ..
 ```
 
 Copy the example environment file and fill in the Reddit values:
@@ -97,10 +98,12 @@ REDDIT_READ_TIMEOUT=20
 MEDIA_CONNECT_TIMEOUT=10
 MEDIA_READ_TIMEOUT=60
 DOWNLOAD_TOTAL_TIMEOUT=300
+MAX_DOWNLOAD_SIZE_MB=2048
 MAX_API_RETRIES=2
 MAX_DOWNLOAD_RETRIES=2
 SEARCH_LIMIT=24
 SEARCH_FETCH_MULTIPLIER=3
+SEARCH_SYNTAX=lucene
 MAX_CONCURRENT_DOWNLOADS=2
 
 REDDIT_USERNAME=your_username
@@ -120,6 +123,18 @@ http://127.0.0.1:8000/api/reddit/auth/callback
 
 ## Run
 
+Build the React frontend:
+
+```powershell
+cd frontend-react
+npm.cmd run build
+cd ..
+```
+
+Use `npm.cmd` on Windows if PowerShell blocks `npm.ps1` with an execution policy error.
+
+Start FastAPI from the repository root:
+
 ```powershell
 python run.py
 ```
@@ -131,6 +146,30 @@ Open:
 - Public app config: http://127.0.0.1:8000/api/app-config
 - Reddit connection test: http://127.0.0.1:8000/api/reddit/test
 - Reddit search: http://127.0.0.1:8000/api/reddit/search?q=mountain&limit=3
+
+If `frontend-react/dist/` does not exist, `/` returns `503 React frontend not built`. Run the build command above and restart the app.
+
+## Local Wi-Fi Access
+
+To expose the app to devices on the same Wi-Fi network, set:
+
+```dotenv
+APP_HOST=0.0.0.0
+```
+
+Restart the app, then open it from another device with this computer's Wi-Fi IPv4 address:
+
+```text
+http://<your-wifi-ip>:8000
+```
+
+On Windows, `ipconfig` shows the Wi-Fi IPv4 address. In the current verified setup, the URL was:
+
+```text
+http://192.168.0.5:8000
+```
+
+Windows Firewall may ask for permission the first time Python listens on the network. Allow access on private networks.
 
 ## Reddit Account OAuth
 
@@ -144,6 +183,20 @@ The app can run anonymously with the configured Reddit app credentials, or with 
 - Click `Disconnect` to delete the local session and return to anonymous mode.
 
 The session file is ignored by git. On startup, the backend attempts to restore the saved refresh token; if it is invalid, the file is deleted and the app falls back to anonymous search.
+
+Reddit requires the configured redirect URI to match exactly. For local-only use, both `.env` and the Reddit app settings should use:
+
+```text
+http://127.0.0.1:8000/api/reddit/auth/callback
+```
+
+For OAuth from another Wi-Fi device, both `.env` and the Reddit app settings must use the LAN URL instead:
+
+```text
+http://<your-wifi-ip>:8000/api/reddit/auth/callback
+```
+
+Do not mix `localhost`, `127.0.0.1`, and the Wi-Fi IP; Reddit treats them as different redirect URIs.
 
 ## Reddit Search API
 
@@ -167,18 +220,27 @@ The response returns normalized media items only and never exposes raw PRAW obje
 Run backend unit tests:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s backend\tests
+python -m unittest discover -s backend\tests
 ```
 
 Run an import/syntax check:
 
 ```powershell
-.\.venv\Scripts\python.exe -m compileall backend run.py
+python -m compileall backend run.py
+```
+
+Run the frontend production build:
+
+```powershell
+cd frontend-react
+npm.cmd run build
 ```
 
 ## Troubleshooting
 
 - `Missing Reddit configuration values`: check `.env` and all `REDDIT_*` keys.
+- `invalid redirect_uri parameter`: update `.env` and the Reddit app settings so `REDDIT_REDIRECT_URI` matches exactly.
 - `Reddit API connection failed`: verify credentials, user agent, network access, and Reddit availability.
 - Port already in use: change `APP_PORT` in `.env`, then restart the app.
-- Browser module 404s: ensure `python run.py` is serving the current FastAPI app so `/js/...` and `/styles/...` mounts are active.
+- `React frontend not built`: run `npm.cmd run build` from `frontend-react/`.
+- Other devices cannot open the app: set `APP_HOST=0.0.0.0`, restart the app, use the Wi-Fi IPv4 address, and allow Python through Windows Firewall on private networks.
