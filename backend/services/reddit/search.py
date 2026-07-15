@@ -65,11 +65,14 @@ class RedditSearchService:
 
         started_at = perf_counter()
         inspect_limit = min(limit * settings.search_fetch_multiplier, 100)
+        mode = self._search_mode(query, subreddit)
+        effective_sort = self._effective_sort(mode, sort)
         client_type, username = self.client_provider.client_context()
         logger.info(
-            "reddit.search.start query=%r subreddit=%s media_type=%s sort=%s "
+            "reddit.search.start mode=%s query=%r subreddit=%s media_type=%s requested_sort=%s "
             "time_filter=%s limit=%s inspect_limit=%s after=%s include_nsfw=%s "
-            "client_type=%s username=%s",
+            "effective_sort=%s client_type=%s username=%s",
+            mode,
             query,
             subreddit or "all",
             media_type,
@@ -79,6 +82,7 @@ class RedditSearchService:
             inspect_limit,
             bool(after),
             include_nsfw,
+            effective_sort,
             client_type,
             username,
         )
@@ -92,18 +96,21 @@ class RedditSearchService:
                 limit=limit,
                 after=after,
                 syntax=settings.search_syntax,
+                mode=mode,
+                effective_sort=effective_sort,
             )
             items, next_after, stats = self._collect_media_items(
                 listing, media_type, limit, include_nsfw
             )
             elapsed_ms = round((perf_counter() - started_at) * 1000)
             logger.info(
-                "reddit.search.success query=%r subreddit=%s raw_submissions_received=%s "
+                "reddit.search.success mode=%s query=%r subreddit=%s raw_submissions_received=%s "
                 "media_detected=%s skipped_text_only=%s skipped_missing_loaded_metadata=%s "
                 "skipped_unsupported=%s skipped_missing_id=%s skipped_duplicate=%s "
                 "skipped_media_filter=%s skipped_nsfw=%s returned_items=%s "
                 "detail_hydration_requests=%s next_after=%s elapsed_ms=%s "
                 "client_type=%s username=%s",
+                mode,
                 query,
                 subreddit or "all",
                 stats.inspected,
@@ -123,8 +130,11 @@ class RedditSearchService:
                 username,
             )
             return RedditSearchResponse(
+                mode=mode,
                 query=query,
                 subreddit=subreddit,
+                requested_sort=sort,
+                effective_sort=effective_sort,
                 media_type=media_type,
                 sort=sort,
                 time_filter=time_filter,
@@ -176,9 +186,13 @@ class RedditSearchService:
         limit: int,
         after: str | None,
         syntax: str | None = None,
+        mode: str | None = None,
+        effective_sort: str | None = None,
     ) -> Any:
         inspect_limit = min(limit * settings.search_fetch_multiplier, 100)
         search_syntax = syntax or settings.search_syntax
+        mode = mode or self._search_mode(query, subreddit)
+        effective_sort = effective_sort or self._effective_sort(mode, sort)
         reddit = self.client_provider.get_client()
         client_type, username = self.client_provider.client_context()
         target_name = subreddit if subreddit else "all"
@@ -189,12 +203,15 @@ class RedditSearchService:
         else:
             params = None
         logger.info(
-            "reddit.search.praw_request query=%r scope=%s subreddit=%s sort=%s "
-            "time_filter=%s syntax=%s fetch_limit=%s after=%s client_type=%s username=%s",
+            "reddit.search.praw_request mode=%s query=%r scope=%s subreddit=%s "
+            "requested_sort=%s effective_sort=%s time_filter=%s syntax=%s "
+            "fetch_limit=%s after=%s client_type=%s username=%s",
+            mode,
             query,
             scope,
             target_name,
             sort,
+            effective_sort,
             time_filter,
             search_syntax,
             inspect_limit,
@@ -213,7 +230,9 @@ class RedditSearchService:
                 search_kwargs["params"] = params
             search_callable = lambda: target.search(query, **search_kwargs)
         else:
-            search_callable = lambda: self._browse_listing(target, sort, time_filter, inspect_limit, params)
+            search_callable = lambda: self._browse_listing(
+                target, effective_sort, time_filter, inspect_limit, params
+            )
 
         last_error: Exception | None = None
         for attempt in range(settings.max_api_retries + 1):
@@ -251,6 +270,22 @@ class RedditSearchService:
         if sort == "top":
             return target.top(time_filter=time_filter, **kwargs)
         return target.hot(**kwargs)
+
+    def _search_mode(self, query: str, subreddit: str | None) -> str:
+        if query and subreddit:
+            return "subreddit_search"
+        if query:
+            return "global_search"
+        return "subreddit_browse"
+
+    def _effective_sort(self, mode: str, requested_sort: str) -> str:
+        if mode != "subreddit_browse":
+            return requested_sort
+        if requested_sort == "top":
+            return "top"
+        if requested_sort in {"new", "comments"}:
+            return "new"
+        return "hot"
 
     def _collect_media_items(
         self,

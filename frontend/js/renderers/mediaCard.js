@@ -6,26 +6,38 @@ import { isSafeHttpUrl } from "../utils/urls.js";
 
 function renderThumbnail(container, item) {
   container.style.removeProperty("--thumb-bg");
-  container.classList.toggle("has-image", isSafeHttpUrl(item.thumbnail_url));
+  const label = document.createElement("span");
+  label.className = "thumbnail-label";
+  label.textContent = item.media_type;
 
   if (isSafeHttpUrl(item.thumbnail_url)) {
+    container.classList.add("thumbnail-loading", "has-image");
+    container.appendChild(label);
     const image = document.createElement("img");
-    image.src = item.thumbnail_url;
     image.alt = "";
     image.loading = "lazy";
     image.referrerPolicy = "no-referrer";
+    image.addEventListener("load", () => {
+      container.classList.remove("thumbnail-loading");
+      container.classList.add("thumbnail-loaded");
+    });
+    image.addEventListener("error", () => {
+      image.remove();
+      container.classList.remove("thumbnail-loading", "has-image");
+      container.classList.add("thumbnail-failed");
+      label.textContent = `${item.media_type} unavailable`;
+    });
+    image.src = item.thumbnail_url;
     container.appendChild(image);
     return;
   }
 
+  container.classList.add("thumbnail-failed");
   container.style.setProperty(
     "--thumb-bg",
     item.thumbnail || "linear-gradient(135deg, #475569 0%, #94a3b8 100%)",
   );
-  const thumbnailLabel = document.createElement("span");
-  thumbnailLabel.className = "thumbnail-label";
-  thumbnailLabel.textContent = item.media_type;
-  container.appendChild(thumbnailLabel);
+  container.appendChild(label);
 }
 
 
@@ -69,23 +81,10 @@ export function createMediaCard(item, options) {
   subreddit.className = "subreddit";
   subreddit.textContent = item.subreddit ? `r/${item.subreddit}` : "r/unknown";
 
-  const meta = document.createElement("div");
+  const meta = document.createElement("p");
   meta.className = "media-meta";
-
-  const mediaType = document.createElement("span");
-  mediaType.textContent = item.media_type.charAt(0).toUpperCase() + item.media_type.slice(1);
-
-  const detail = document.createElement("span");
-  detail.textContent = formatMediaDetail(item);
-
-  const footnote = document.createElement("p");
-  footnote.className = "card-footnote";
-
-  const author = document.createElement("span");
-  author.textContent = `by ${item.author || "[deleted]"}`;
-
-  const createdAt = document.createElement("span");
-  createdAt.textContent = formatRedditDate(item);
+  const detail = formatMediaDetail(item);
+  meta.textContent = [detail, formatRedditDate(item)].filter(Boolean).join(" · ");
 
   selectWrap.appendChild(checkbox);
   renderThumbnail(thumbnail, item);
@@ -94,9 +93,7 @@ export function createMediaCard(item, options) {
     thumbnail.append(nsfwBadge);
   }
   thumbnail.append(selectWrap);
-  meta.append(mediaType, detail);
-  footnote.append(author, createdAt);
-  body.append(title, subreddit, meta, footnote);
+  body.append(title, subreddit, meta);
   article.append(thumbnail, body);
   return article;
 }

@@ -23,12 +23,14 @@ export function logoutRedditAuth() {
 
 export function searchRedditMedia(params) {
   const searchParams = new URLSearchParams({
-    q: params.query,
     media_type: params.mediaType,
     sort: params.sort,
     time_filter: params.timeFilter || "all",
     limit: String(params.limit || 24),
   });
+  if (params.query?.trim()) {
+    searchParams.set("q", params.query.trim());
+  }
   if (params.subreddit) {
     searchParams.set("subreddit", params.subreddit);
   }

@@ -15,7 +15,7 @@ from backend.utils.urls import (
 
 
 ALLOWED_MEDIA_TYPES = {"all", "image", "video", "gif", "gallery", "external"}
-ALLOWED_SORTS = {"relevance", "hot", "top", "new"}
+ALLOWED_SORTS = {"relevance", "hot", "top", "new", "comments"}
 ALLOWED_TIME_FILTERS = {"hour", "day", "week", "month", "year", "all"}
 SUBREDDIT_NAME_RE = re.compile(r"^[A-Za-z0-9_]{2,21}$")
 

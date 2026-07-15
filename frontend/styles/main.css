@@ -6,6 +6,10 @@
 @import url("./states.css");
 @import url("./responsive.css");
 
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --color-bg: #f4f6f9;
   --color-surface: #ffffff;

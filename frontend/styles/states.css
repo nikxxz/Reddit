@@ -33,19 +33,29 @@
   margin: 0;
 }
 
-.skeleton-grid {
+.skeleton-grid,
+.load-more-skeletons {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
-.skeleton-grid span {
+.skeleton-grid span,
+.load-more-skeletons span {
   min-height: 190px;
   border-radius: var(--radius-card);
   background: linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%);
   background-size: 200% 100%;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.load-more-skeletons {
+  padding-top: 1rem;
+}
+
+.load-more-skeletons span {
+  min-height: 120px;
 }
 
 .error-state {

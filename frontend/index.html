@@ -45,6 +45,7 @@
         </nav>
 
         <section class="status-panel" aria-label="Connection status">
+          <span class="status-panel-title">Connections</span>
           <div class="status-row" id="backend-status" title="Backend API: Checking">
             <span class="status-label">Backend API</span>
             <span class="status-value">
@@ -163,9 +164,9 @@
 
             <div class="media-grid" id="media-grid" aria-live="polite"></div>
 
-            <div class="loading-state" id="loading-state" hidden>
+            <div class="loading-state" id="loading-state" aria-live="polite" hidden>
               <h2>Searching Reddit...</h2>
-              <div class="skeleton-grid" aria-hidden="true">
+              <div class="skeleton-grid" aria-hidden="true" data-skeleton-kind="fresh">
                 <span></span>
                 <span></span>
                 <span></span>
@@ -176,11 +177,11 @@
             </div>
 
             <div class="empty-state" id="empty-state" hidden>
-              <h2>No matching media found</h2>
+              <h2 id="empty-title">No matching media found</h2>
               <p id="empty-message">Try choosing another media type filter.</p>
             </div>
 
-            <div class="error-state" id="error-state" hidden>
+            <div class="error-state" id="error-state" role="alert" hidden>
               <div>
                 <h2>Reddit search failed</h2>
                 <p id="error-message">Unable to search Reddit at this time.</p>
@@ -190,6 +191,16 @@
 
             <div class="load-more-row" id="load-more-row" hidden>
               <button type="button" id="load-more-button">Load More</button>
+            </div>
+            <div
+              class="load-more-skeletons"
+              id="load-more-skeletons"
+              aria-hidden="true"
+              hidden
+            >
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
           </section>
         </section>

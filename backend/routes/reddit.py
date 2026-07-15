@@ -157,7 +157,7 @@ def validate_search_params(
             detail="That subreddit could not be found or is unavailable.",
         ) from None
     if not clean_query and not clean_subreddit:
-        raise HTTPException(status_code=400, detail="Search query or subreddit is required.")
+        raise HTTPException(status_code=400, detail="Enter a keyword or subreddit.")
 
     if media_type not in ALLOWED_MEDIA_TYPES:
         raise HTTPException(status_code=400, detail="Invalid media_type.")

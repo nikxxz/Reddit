@@ -16,10 +16,15 @@
 
   .sidebar .brand-text,
   .sidebar .brand-subtext,
-  .sidebar .nav-label,
-  .sidebar .status-label,
-  .sidebar .status-text,
-  .sidebar .toggle-label,
+    .sidebar .nav-label,
+    .sidebar .status-label,
+    .sidebar .status-text,
+    .sidebar .status-panel-title,
+    .sidebar .account-title,
+    .sidebar .account-status,
+    .sidebar .account-username,
+    .sidebar .account-button,
+    .sidebar .toggle-label,
   .sidebar .toggle-expanded {
     opacity: 0;
     visibility: hidden;

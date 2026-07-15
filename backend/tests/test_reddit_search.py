@@ -83,7 +83,7 @@ class RedditSearchConstantsTests(unittest.TestCase):
     def test_expected_search_values_are_supported(self):
         self.assertIn("image", ALLOWED_MEDIA_TYPES)
         self.assertIn("external", ALLOWED_MEDIA_TYPES)
-        self.assertNotIn("comments", ALLOWED_SORTS)
+        self.assertIn("comments", ALLOWED_SORTS)
         self.assertIn("all", ALLOWED_TIME_FILTERS)
 
     def test_subreddit_input_normalization(self):
@@ -149,6 +149,38 @@ class RedditSearchConstantsTests(unittest.TestCase):
         )
         self.assertEqual(provider.reddit.requested_subreddits, ["all"])
 
+    def test_subreddit_only_new_uses_new_listing(self):
+        provider = FakeProvider()
+        service = RedditSearchService(provider)
+        service._search_listing("", "wallpapers", "new", "all", 24, None)
+        self.assertEqual(provider.reddit.targets["wallpapers"].calls[0][0], "new")
+
+    def test_subreddit_only_hot_uses_hot_listing(self):
+        provider = FakeProvider()
+        service = RedditSearchService(provider)
+        service._search_listing("", "wallpapers", "hot", "all", 24, None)
+        self.assertEqual(provider.reddit.targets["wallpapers"].calls[0][0], "hot")
+
+    def test_subreddit_only_top_uses_top_listing(self):
+        provider = FakeProvider()
+        service = RedditSearchService(provider)
+        service._search_listing("", "wallpapers", "top", "year", 24, None)
+        method, _, kwargs = provider.reddit.targets["wallpapers"].calls[0]
+        self.assertEqual(method, "top")
+        self.assertEqual(kwargs["time_filter"], "year")
+
+    def test_subreddit_only_relevance_falls_back_to_hot(self):
+        provider = FakeProvider()
+        service = RedditSearchService(provider)
+        service._search_listing("", "wallpapers", "relevance", "all", 24, None)
+        self.assertEqual(provider.reddit.targets["wallpapers"].calls[0][0], "hot")
+
+    def test_subreddit_only_comments_falls_back_to_new(self):
+        provider = FakeProvider()
+        service = RedditSearchService(provider)
+        service._search_listing("", "wallpapers", "comments", "all", 24, None)
+        self.assertEqual(provider.reddit.targets["wallpapers"].calls[0][0], "new")
+
     def test_search_service_passes_query_sort_time_filter_syntax_and_limit(self):
         provider = FakeProvider()
         service = RedditSearchService(provider)
@@ -186,6 +218,19 @@ class RedditSearchConstantsTests(unittest.TestCase):
         )
         self.assertEqual(service.kwargs["subreddit"], "CosplaySub")
         self.assertEqual(response.subreddit, "CosplaySub")
+
+    def test_subreddit_only_request_applies_image_filter_and_nsfw_filter(self):
+        service = RedditSearchService()
+        items, _, stats = service._collect_media_items(
+            [direct_image_submission(), nsfw_submission(), text_submission()],
+            "image",
+            24,
+            False,
+        )
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].media_type, "image")
+        self.assertEqual(stats.skipped_nsfw, 1)
+        self.assertEqual(stats.skipped_text_only, 1)
 
     def test_frontend_sends_subreddit_parameter(self):
         source = Path("frontend/js/api/redditApi.js").read_text()

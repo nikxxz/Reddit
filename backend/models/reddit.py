@@ -30,8 +30,11 @@ class RedditMediaItem(BaseModel):
 
 
 class RedditSearchResponse(BaseModel):
+    mode: str | None = None
     query: str
     subreddit: str | None = None
+    requested_sort: str | None = None
+    effective_sort: str | None = None
     media_type: str
     sort: str
     time_filter: str
