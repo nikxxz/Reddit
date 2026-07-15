@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBackendHealth } from "./api/healthApi";
 import { getRedditConnectionStatus } from "./api/redditApi";
-import { ConnectionCard } from "./components/ConnectionCard";
+import { AppLayout } from "./components/layout/AppLayout";
 import "./styles/app.css";
 
 const CHECKING_STATE = {
@@ -71,45 +71,10 @@ export default function App() {
   );
 
   return (
-    <main className="app-shell">
-      <section className="workspace" aria-labelledby="workspace-title">
-        <header className="workspace-header">
-          <h1 id="workspace-title">Reddit Media Downloader</h1>
-          <p>React Migration Workspace</p>
-        </header>
-
-        <div className="workspace-body">
-          <p>Existing FastAPI backend connectivity</p>
-
-          <div className="connection-grid">
-            <ConnectionCard
-              title="Backend API"
-              status={connections.backend.status}
-              message={connections.backend.message}
-            />
-            <ConnectionCard
-              title="Reddit API"
-              status={connections.reddit.status}
-              message={connections.reddit.message}
-            />
-          </div>
-
-          <div className="actions">
-            <button
-              className="retry-button"
-              type="button"
-              onClick={handleRetry}
-              disabled={isChecking}
-            >
-              Retry Connections
-            </button>
-          </div>
-
-          <p className="workspace-footer">
-            Current frontend remains available on port 8000.
-          </p>
-        </div>
-      </section>
-    </main>
+    <AppLayout
+      connections={connections}
+      isChecking={isChecking}
+      onRetryConnections={handleRetry}
+    />
   );
 }
