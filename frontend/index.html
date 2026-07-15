@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reddit Media Downloader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="card">
+        <h1>Reddit Media Downloader</h1>
+        <p class="description">
+          Paste a Reddit post URL to inspect it and prepare media downloads.
+        </p>
+
+        <label class="input-group" for="reddit-url">
+          <span>Reddit URL</span>
+          <input
+            id="reddit-url"
+            name="reddit-url"
+            type="url"
+            placeholder="https://www.reddit.com/r/..."
+          />
+        </label>
+
+        <button id="analyse-btn" type="button" disabled>Analyse</button>
+        <p id="status" class="status">Backend connection: checking...</p>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light dark;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f5f7fb;
+  color: #1f2937;
+}
+
+.app-shell {
+  width: min(92vw, 560px);
+  padding: 1rem;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  padding: 2rem;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.8rem;
+}
+
+.description {
+  margin: 0 0 1.25rem;
+  color: #4b5563;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+input {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 1rem;
+}
+
+button {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 1.25rem;
+  }
+}
