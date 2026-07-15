@@ -1,4 +1,4 @@
-import { Collapse, Divider, Paper, Stack, Text, Title } from "@mantine/core";
+import { Divider, Paper, Stack, Text, Title } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { useEffect, useRef, useState } from "react";
 import { SearchFilters } from "../components/search/SearchFilters";
@@ -82,7 +82,7 @@ export function SearchPage() {
           />
         ) : null}
 
-        <Collapse in={!showCollapsedSummary || filtersExpanded}>
+        {!showCollapsedSummary ? (
           <Paper
             className="search-controls-panel"
             component="section"
@@ -113,7 +113,7 @@ export function SearchPage() {
               <SearchFilters values={values} onFieldChange={setFieldValue} />
             </Stack>
           </Paper>
-        </Collapse>
+        ) : null}
       </div>
 
       <div className="search-results-container">
