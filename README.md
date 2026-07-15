@@ -57,6 +57,13 @@ Do not add FFmpeg orchestration or download queue behavior outside those future 
 
 The frontend uses browser-native ES modules and has no build step.
 
+## Frontend Migration Status
+
+- `frontend/` contains the current production frontend.
+- `frontend-react/` contains the parallel React migration workspace.
+- FastAPI continues to serve `frontend/`.
+- Do not remove `frontend/` until React feature parity is verified.
+
 ## Setup
 
 Requirements:

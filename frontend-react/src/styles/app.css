@@ -1,0 +1,173 @@
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.workspace {
+  width: min(100%, 760px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(30, 36, 48, 0.08);
+}
+
+.workspace-header {
+  border-bottom: 1px solid var(--border);
+  padding: 28px 32px;
+}
+
+.workspace-header h1 {
+  margin: 0;
+  font-size: 1.65rem;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.workspace-header p,
+.workspace-body > p,
+.workspace-footer {
+  color: var(--muted-text);
+}
+
+.workspace-header p {
+  margin: 8px 0 0;
+  font-size: 1rem;
+}
+
+.workspace-body {
+  padding: 32px;
+}
+
+.workspace-body > p {
+  margin: 0 0 20px;
+}
+
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.connection-card {
+  min-height: 146px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.connection-card h2 {
+  margin: 0 0 18px;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.connection-card p {
+  margin: 16px 0 0;
+  color: var(--muted-text);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 650;
+}
+
+.status-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+
+.status-checking .status-dot {
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+.status-online .status-dot {
+  background: var(--success);
+}
+
+.status-failed .status-dot {
+  background: var(--error);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.retry-button {
+  min-height: 42px;
+  border: 1px solid var(--primary-accent);
+  border-radius: 6px;
+  background: var(--primary-accent);
+  color: #ffffff;
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.retry-button:hover {
+  filter: brightness(0.96);
+}
+
+.retry-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.workspace-footer {
+  margin: 22px 0 0;
+  font-size: 0.95rem;
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.86);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-checking .status-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    align-items: stretch;
+    padding: 18px;
+  }
+
+  .workspace-header,
+  .workspace-body {
+    padding: 24px 20px;
+  }
+
+  .workspace-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .connection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .retry-button {
+    width: 100%;
+  }
+}
