@@ -1,4 +1,4 @@
-from backend.models.common import AppConfigResponse, HealthResponse
+from backend.models.common import AppConfigResponse, HealthResponse, SystemStatusResponse
 from backend.models.reddit import (
     RedditConnectionStatus,
     RedditMediaItem,
@@ -8,6 +8,7 @@ from backend.models.reddit import (
 __all__ = [
     "AppConfigResponse",
     "HealthResponse",
+    "SystemStatusResponse",
     "RedditConnectionStatus",
     "RedditMediaItem",
     "RedditSearchResponse",

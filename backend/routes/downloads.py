@@ -7,6 +7,7 @@ from backend.models.downloads import (
     DownloadStartResponse,
     DownloadStatusResponse,
 )
+from backend.services.downloads.errors import DownloadError
 from backend.services.downloads.manager import download_job_manager
 
 
@@ -15,7 +16,10 @@ router = APIRouter(tags=["downloads"])
 
 @router.post("/downloads", response_model=DownloadStartResponse)
 async def start_download(request: DownloadRequest) -> DownloadStartResponse:
-    job = await download_job_manager.create_job(request)
+    try:
+        job = await download_job_manager.create_job(request)
+    except DownloadError as exc:
+        raise HTTPException(status_code=507, detail=str(exc)) from exc
     return DownloadStartResponse(job_id=job.job_id, status="queued")
 
 

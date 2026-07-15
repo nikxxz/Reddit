@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import threading
 from pathlib import Path
 from typing import Any
@@ -10,6 +9,7 @@ from yt_dlp import YoutubeDL
 from backend.services.downloads.errors import DownloadCancelled, DownloadError
 from backend.services.downloads.direct import validate_download_url
 from backend.services.downloads.filenames import unique_path
+from backend.services.system import ffmpeg_available
 
 YT_DLP_ALLOWED_HOSTS = {
     "reddit.com",
@@ -23,10 +23,6 @@ YT_DLP_ALLOWED_HOSTS = {
     "streamable.com",
     "www.streamable.com",
 }
-
-
-def ffmpeg_available() -> bool:
-    return shutil.which("ffmpeg") is not None
 
 
 def download_with_yt_dlp(
@@ -63,6 +59,11 @@ def download_with_yt_dlp(
             downloaded_filename = ydl.prepare_filename(result)
     except Exception as exc:
         if isinstance(exc, DownloadCancelled):
+            for part_file in output_dir.glob(f"{target.stem}*.part"):
+                try:
+                    part_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
             raise
         raise DownloadError("The selected media could not be resolved.") from exc
     return Path(downloaded_filename)

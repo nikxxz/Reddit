@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from backend.services.downloads.direct import download_direct_url
-from backend.services.downloads.errors import DownloadError
+from backend.services.downloads.errors import DownloadCancelled, DownloadError
 
 
 GalleryProgressCallback = Callable[[int, int, int, int | None], None]
@@ -25,6 +25,8 @@ def download_gallery_urls(
     total = len(urls)
 
     for index, (url, filename) in enumerate(zip(urls, filenames), start=1):
+        if cancel_event and cancel_event.is_set():
+            raise DownloadCancelled("The download was cancelled.")
         try:
             path = download_direct_url(
                 url,
@@ -41,6 +43,8 @@ def download_gallery_urls(
                 cancel_event=cancel_event,
             )
             completed.append({"index": index, "filename": path.name, "status": "completed"})
+        except DownloadCancelled:
+            raise
         except Exception as exc:
             failed.append(
                 {
