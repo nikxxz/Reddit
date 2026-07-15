@@ -6,7 +6,6 @@ import { DownloadActions } from "../downloads/DownloadActions";
 import { useDownloadJob } from "../../hooks/useDownloadJob";
 import { GalleryPreviewCarousel } from "./GalleryPreviewCarousel";
 import {
-  getMediaUrls,
   getMediaTypeLabel,
   getModalMetadata,
   getPrimaryMediaUrl,
@@ -88,13 +87,14 @@ export function MediaPreviewModal({ opened, item, onClose }) {
   const isMobile = useMediaQuery("(max-width: 48em)");
   const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
   const downloadJob = useDownloadJob();
+  const { reset } = downloadJob;
   const redditUrl = item ? getRedditUrl(item) : null;
   const metadata = item ? getModalMetadata(item) : [];
 
   useEffect(() => {
     setActiveGalleryIndex(0);
-    downloadJob.reset();
-  }, [item?.id]);
+    reset();
+  }, [item?.id, reset]);
 
   const createDownloadPayload = (scope) => {
     if (!item) {

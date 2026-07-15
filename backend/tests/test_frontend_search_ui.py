@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def read_frontend(path: str) -> str:
-    return (ROOT / "frontend" / path).read_text(encoding="utf-8")
+    return (ROOT / "legacy" / "frontend" / path).read_text(encoding="utf-8")
 
 
 class FrontendSearchUiSourceTests(unittest.TestCase):

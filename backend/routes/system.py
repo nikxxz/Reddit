@@ -16,6 +16,7 @@ from backend.core.paths import get_thumbnail_root
 from backend.database.health import check_database_health
 from backend.database.repositories.downloads import counts as library_counts
 from backend.services.library.backups import backup_status
+from backend.services.lifecycle import application_lifecycle
 
 
 router = APIRouter(tags=["system"])
@@ -26,6 +27,7 @@ def system_status() -> SystemStatusResponse:
     active_downloads, queued_downloads = download_job_manager.active_counts()
     database_backup_available, database_last_backup_at = backup_status()
     database_health = check_database_health()
+    lifecycle = application_lifecycle.snapshot()
     try:
         library = library_counts()
     except Exception:
@@ -52,4 +54,12 @@ def system_status() -> SystemStatusResponse:
         library_file_count=library["files"],
         library_missing_file_count=library["missing_files"],
         thumbnail_directory_ready=get_thumbnail_root().exists(),
+        application_ready=lifecycle.ready,
+        application_shutting_down=lifecycle.shutting_down,
+        library_reconciliation_in_progress=lifecycle.library_reconciliation_in_progress,
+        maintenance_tasks_running=lifecycle.maintenance_tasks_running,
+        active_background_tasks=lifecycle.active_background_tasks,
+        last_reconciliation_at=lifecycle.last_reconciliation_at,
+        last_reconciliation_error=lifecycle.last_reconciliation_error,
+        last_backup_at=database_last_backup_at,
     )

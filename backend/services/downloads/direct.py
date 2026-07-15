@@ -80,6 +80,8 @@ def download_direct_url(
 
     try:
         for attempt in range(settings.max_download_retries + 1):
+            if cancel_event and cancel_event.is_set():
+                raise DownloadCancelled("The download was cancelled.")
             try:
                 return _stream_to_file(
                     url,
@@ -132,6 +134,8 @@ def _stream_to_file(
     bytes_written = 0
     current_url = url
     for _ in range(6):
+        if cancel_event and cancel_event.is_set():
+            raise DownloadCancelled("The download was cancelled.")
         validate_download_url(current_url)
         with httpx.stream("GET", current_url, timeout=timeout, follow_redirects=False) as response:
             status_code = getattr(response, "status_code", getattr(getattr(response, "response", None), "status_code", 200))

@@ -4,8 +4,10 @@ __pycache__/
 *.pyc
 *.pid
 .codex-*.pid
+*.log
 .env
 downloads/*
+*.part
 !downloads/.gitkeep
 app-data/database/*.sqlite3
 app-data/database/*.sqlite3-wal
@@ -21,6 +23,11 @@ backend/data/session.json
 frontend-react/node_modules/
 frontend-react/dist/
 frontend-react/.vite/
+frontend-react/coverage/
+.npm/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage/
+*.tmp
+*.temp

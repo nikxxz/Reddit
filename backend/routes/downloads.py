@@ -12,7 +12,7 @@ from backend.models.downloads import (
     DownloadStartResponse,
     DownloadStatusResponse,
 )
-from backend.services.downloads.errors import DuplicateDownloadError, DownloadError
+from backend.services.downloads.errors import ApplicationShuttingDownError, DuplicateDownloadError, DownloadError
 from backend.services.downloads.manager import download_job_manager
 from backend.database.repositories import downloads as downloads_repo
 from backend.utils.logging import get_logger
@@ -67,6 +67,14 @@ def list_downloads(
 async def start_download(request: DownloadRequest) -> DownloadStartResponse:
     try:
         job = await download_job_manager.create_job(request)
+    except ApplicationShuttingDownError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": str(exc),
+                "error_code": exc.error_code,
+            },
+        ) from exc
     except DuplicateDownloadError as exc:
         raise HTTPException(
             status_code=409,
@@ -115,6 +123,14 @@ def cancel_download(job_id: str) -> DownloadStatusResponse:
 async def retry_download(job_id: str) -> DownloadStartResponse:
     try:
         job = await download_job_manager.retry_job(job_id)
+    except ApplicationShuttingDownError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": str(exc),
+                "error_code": exc.error_code,
+            },
+        ) from exc
     except DownloadError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if job is None:

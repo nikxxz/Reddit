@@ -18,7 +18,14 @@ from backend.models.downloads import (
     DownloadedFile,
 )
 from backend.services.downloads.direct import download_direct_url
-from backend.services.downloads.errors import DuplicateDownloadError, DownloadCancelled, DownloadError, MediaResolutionError
+from backend.services.background import background_task_registry
+from backend.services.downloads.errors import (
+    ApplicationShuttingDownError,
+    DuplicateDownloadError,
+    DownloadCancelled,
+    DownloadError,
+    MediaResolutionError,
+)
 from backend.services.downloads.gallery import download_gallery_urls
 from backend.services.downloads.resolver import RETRYABLE_RESOLUTION_CODES, resolve_download_request
 from backend.services.reddit.media_cache import normalized_media_cache
@@ -87,14 +94,26 @@ class DownloadJob:
     _last_progress_persisted_value: int | None = None
 
 
+@dataclass
+class DownloadShutdownResult:
+    jobs_active: int = 0
+    jobs_cancelled: int = 0
+    jobs_interrupted: int = 0
+    timed_out: bool = False
+
+
 class DownloadJobManager:
     def __init__(self, max_concurrent: int | None = None) -> None:
         self.jobs: dict[str, DownloadJob] = {}
+        self.job_tasks: dict[str, asyncio.Task] = {}
         self.lock = threading.RLock()
         self.semaphore = asyncio.Semaphore(max_concurrent or settings.max_concurrent_downloads)
+        self.shutting_down = False
         logger.info("download.ffmpeg.status available=%s", ffmpeg_available())
 
     async def create_job(self, request: DownloadRequest, retry_of_download_id: str | None = None) -> DownloadJob:
+        if self.shutting_down:
+            raise ApplicationShuttingDownError()
         self.cleanup_jobs()
         if not has_minimum_free_space(settings.download_dir_path):
             raise DownloadError("Not enough free disk space to start this download.")
@@ -128,7 +147,15 @@ class DownloadJobManager:
             request.subreddit,
             request.author,
         )
-        asyncio.create_task(self._run_job(job))
+        task = await background_task_registry.create(
+            self._run_job(job),
+            name=f"download-job-{job.job_id}",
+            group="download_jobs",
+            metadata={"job_id": job.job_id},
+        )
+        with self.lock:
+            self.job_tasks[job.job_id] = task
+        task.add_done_callback(lambda _task, job_id=job.job_id: self._forget_task(job_id))
         return job
 
     def get_status(self, job_id: str) -> DownloadStatusResponse | None:
@@ -157,6 +184,8 @@ class DownloadJobManager:
         return self._response(job)
 
     async def retry_job(self, job_id: str) -> DownloadJob | None:
+        if self.shutting_down:
+            raise ApplicationShuttingDownError()
         started = monotonic()
         logger.info("download.job.retry.start old_job_id=%s", job_id)
         with self.lock:
@@ -256,12 +285,70 @@ class DownloadJobManager:
             queued = sum(1 for job in self.jobs.values() if job.status == "queued")
         return active, queued
 
+    async def shutdown(self, grace_period_seconds: float) -> DownloadShutdownResult:
+        started = monotonic()
+        self.shutting_down = True
+        result = DownloadShutdownResult()
+        logger.info("application.download_manager.shutdown.begin")
+        with self.lock:
+            jobs = list(self.jobs.values())
+            tasks = list(self.job_tasks.values())
+        for job in jobs:
+            if job.status in TERMINAL_STATUSES:
+                continue
+            job.cancel_event.set()
+            if job.status == "queued":
+                if self.transition_job(
+                    job,
+                    "cancelled",
+                    progress=None,
+                    error="The download was cancelled because the application is shutting down.",
+                    error_code="application_shutdown",
+                    message="Download cancelled during shutdown",
+                ):
+                    result.jobs_cancelled += 1
+            else:
+                result.jobs_active += 1
+                if self.transition_job(
+                    job,
+                    "failed",
+                    progress=None,
+                    error="The download was interrupted because the application is shutting down.",
+                    error_code="interrupted_by_shutdown",
+                    message="Download interrupted during shutdown",
+                ):
+                    result.jobs_interrupted += 1
+        if tasks:
+            done, pending = await asyncio.wait(tasks, timeout=grace_period_seconds)
+            for task in pending:
+                task.cancel()
+            if pending:
+                result.timed_out = True
+                logger.warning(
+                    "application.shutdown.timeout jobs_active=%s elapsed_ms=%s",
+                    len(pending),
+                    int((monotonic() - started) * 1000),
+                )
+        self.cleanup_stale_part_files()
+        logger.info(
+            "application.download_manager.shutdown.completed jobs_active=%s jobs_cancelled=%s jobs_interrupted=%s elapsed_ms=%s",
+            result.jobs_active,
+            result.jobs_cancelled,
+            result.jobs_interrupted,
+            int((monotonic() - started) * 1000),
+        )
+        return result
+
     def active_part_paths(self) -> set[Path]:
         with self.lock:
             return {path for job in self.jobs.values() if job.status in NON_TERMINAL_STATUSES for path in job.partial_paths}
 
     def cleanup_stale_part_files(self) -> dict[str, int]:
         return cleanup_stale_part_files(active_part_paths=self.active_part_paths())
+
+    def _forget_task(self, job_id: str) -> None:
+        with self.lock:
+            self.job_tasks.pop(job_id, None)
 
     def transition_job(self, job: DownloadJob, new_status: str, **updates: object) -> bool:
         should_persist = False

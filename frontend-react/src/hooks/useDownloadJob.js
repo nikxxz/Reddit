@@ -64,7 +64,7 @@ export function useDownloadJob() {
         if (TERMINAL_STATUSES.has(status.status)) {
           stopPolling();
         }
-      } catch (error) {
+      } catch {
         setState((current) => ({
           ...current,
           status: "failed",

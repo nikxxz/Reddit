@@ -61,9 +61,16 @@ class Settings(BaseModel):
     checksum_large_file_threshold_mb: int = Field(default=2048, gt=0)
     max_api_retries: int = Field(default=2, ge=0)
     max_download_retries: int = Field(default=2, ge=0)
+    shutdown_grace_period_seconds: float = Field(default=15, gt=0)
+    download_cancel_timeout_seconds: float = Field(default=10, gt=0)
+    subprocess_terminate_timeout_seconds: float = Field(default=5, gt=0)
     download_job_retention_hours: float = Field(default=24, ge=0)
     failed_job_retention_hours: float = Field(default=48, ge=0)
     part_file_max_age_hours: float = Field(default=12, ge=0)
+    maintenance_interval_minutes: float = Field(default=30, gt=0)
+    library_reconcile_batch_size: int = Field(default=100, ge=1)
+    library_reconcile_max_concurrency: int = Field(default=4, ge=1)
+    thumbnail_regen_max_concurrency: int = Field(default=2, ge=1)
     media_cache_ttl_minutes: float = Field(default=45, gt=0)
     media_cache_max_items: int = Field(default=1000, ge=1)
     reddit_hydration_timeout: float = Field(default=20, gt=0)
@@ -149,9 +156,16 @@ ENV_FIELDS = {
     "CHECKSUM_LARGE_FILE_THRESHOLD_MB": ("checksum_large_file_threshold_mb", int),
     "MAX_API_RETRIES": ("max_api_retries", int),
     "MAX_DOWNLOAD_RETRIES": ("max_download_retries", int),
+    "SHUTDOWN_GRACE_PERIOD_SECONDS": ("shutdown_grace_period_seconds", float),
+    "DOWNLOAD_CANCEL_TIMEOUT_SECONDS": ("download_cancel_timeout_seconds", float),
+    "SUBPROCESS_TERMINATE_TIMEOUT_SECONDS": ("subprocess_terminate_timeout_seconds", float),
     "DOWNLOAD_JOB_RETENTION_HOURS": ("download_job_retention_hours", float),
     "FAILED_JOB_RETENTION_HOURS": ("failed_job_retention_hours", float),
     "PART_FILE_MAX_AGE_HOURS": ("part_file_max_age_hours", float),
+    "MAINTENANCE_INTERVAL_MINUTES": ("maintenance_interval_minutes", float),
+    "LIBRARY_RECONCILE_BATCH_SIZE": ("library_reconcile_batch_size", int),
+    "LIBRARY_RECONCILE_MAX_CONCURRENCY": ("library_reconcile_max_concurrency", int),
+    "THUMBNAIL_REGEN_MAX_CONCURRENCY": ("thumbnail_regen_max_concurrency", int),
     "MEDIA_CACHE_TTL_MINUTES": ("media_cache_ttl_minutes", float),
     "MEDIA_CACHE_MAX_ITEMS": ("media_cache_max_items", int),
     "REDDIT_HYDRATION_TIMEOUT": ("reddit_hydration_timeout", float),

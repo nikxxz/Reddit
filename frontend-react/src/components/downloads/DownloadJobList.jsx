@@ -3,10 +3,10 @@ import { DownloadJobCard } from "./DownloadJobCard";
 import { DownloadsEmptyState } from "./DownloadsEmptyState";
 
 const GROUPS = [
-  { key: "active", label: "Active", statuses: ["resolving", "downloading", "merging"] },
+  { key: "active", label: "Active", statuses: ["resolving", "downloading", "merging", "finalizing"] },
   { key: "queued", label: "Queued", statuses: ["queued"] },
   { key: "failed", label: "Failed", statuses: ["failed"] },
-  { key: "completed", label: "Completed", statuses: ["completed"] },
+  { key: "completed", label: "Completed", statuses: ["completed", "completed_with_errors"] },
   { key: "cancelled", label: "Cancelled", statuses: ["cancelled"] }
 ];
 

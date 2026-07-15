@@ -9,8 +9,8 @@ import { AppSidebar } from "./AppSidebar";
 
 export function AppLayout({
   connections,
-  isChecking,
-  onRetryConnections,
+  isChecking: _isChecking,
+  onRetryConnections: _onRetryConnections,
   redditAuth
 }) {
   const isMobile = useMediaQuery("(max-width: 48em)");

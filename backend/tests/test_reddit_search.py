@@ -233,7 +233,7 @@ class RedditSearchConstantsTests(unittest.TestCase):
         self.assertEqual(stats.skipped_text_only, 1)
 
     def test_frontend_sends_subreddit_parameter(self):
-        source = Path("frontend/js/api/redditApi.js").read_text()
+        source = Path("legacy/frontend/js/api/redditApi.js").read_text()
         self.assertIn('searchParams.set("subreddit", params.subreddit)', source)
 
     def test_raw_match_with_direct_image_survives_without_dimensions(self):

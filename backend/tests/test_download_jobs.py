@@ -205,13 +205,17 @@ class DownloadJobTests(unittest.IsolatedAsyncioTestCase):
         request = DownloadRequest(post_id="abc123", media_type="image", media_url="https://i.redd.it/example.jpg")
         duplicate = {"id": "existing", "availability": "available", "status": "completed"}
 
-        def close_task(coro):
+        class FakeTask:
+            def add_done_callback(self, _callback):
+                return None
+
+        async def create_task(coro, **_kwargs):
             coro.close()
-            return None
+            return FakeTask()
 
         with patch("backend.services.downloads.manager.duplicate_for_request", return_value=duplicate), patch(
             "backend.services.downloads.manager.has_minimum_free_space", return_value=True
-        ), patch("backend.services.downloads.manager.asyncio.create_task", side_effect=close_task):
+        ), patch("backend.services.downloads.manager.background_task_registry.create", side_effect=create_task):
             with self.assertRaises(DuplicateDownloadError) as context:
                 await manager.create_job(request)
             forced = await manager.create_job(request.model_copy(update={"force_download": True}))

@@ -20,6 +20,13 @@ class DownloadError(RuntimeError):
     error_code: str | None = None
 
 
+class ApplicationShuttingDownError(DownloadError):
+    error_code = "application_shutting_down"
+
+    def __init__(self) -> None:
+        super().__init__("The application is shutting down and cannot start new downloads.")
+
+
 class DuplicateDownloadError(DownloadError):
     error_code = "duplicate_download"
 

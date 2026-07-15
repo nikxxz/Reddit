@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: windows-latest
+    env:
+      APP_HOST: 127.0.0.1
+      APP_PORT: 8000
+      DEBUG: "false"
+      REDDIT_CLIENT_ID: test-client-id
+      REDDIT_CLIENT_SECRET: test-client-secret
+      REDDIT_USER_AGENT: windows:reddit-media-downloader:test (by /u/test)
+      LIBRARY_RECONCILE_ON_STARTUP: "false"
+      GENERATE_MISSING_THUMBNAILS_ON_STARTUP: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m compileall backend
+      - run: pytest
+
+  frontend:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend-react/package-lock.json
+      - run: npm ci
+        working-directory: frontend-react
+      - run: npm run lint
+        working-directory: frontend-react
+      - run: npm run test:run
+        working-directory: frontend-react
+      - run: npm run build
+        working-directory: frontend-react
