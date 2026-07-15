@@ -16,6 +16,15 @@
   padding: 8px 0;
 }
 
+.search-result-skeleton-card {
+  min-width: 0;
+}
+
+.search-result-skeleton-preview {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
 .search-result-thumb {
   flex: 0 0 112px;
   width: 112px;

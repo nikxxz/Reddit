@@ -16,6 +16,39 @@ Object.defineProperty(window, "matchMedia", {
   }))
 });
 
+class MockIntersectionObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+  takeRecords = vi.fn(() => []);
+}
+
+class MockResizeObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+Object.defineProperty(window, "IntersectionObserver", {
+  writable: true,
+  value: MockIntersectionObserver
+});
+
+Object.defineProperty(globalThis, "IntersectionObserver", {
+  writable: true,
+  value: MockIntersectionObserver
+});
+
+Object.defineProperty(window, "ResizeObserver", {
+  writable: true,
+  value: MockResizeObserver
+});
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  writable: true,
+  value: MockResizeObserver
+});
+
 afterEach(() => {
   cleanup();
 });

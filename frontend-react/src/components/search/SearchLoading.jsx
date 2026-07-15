@@ -10,18 +10,16 @@ export function SearchLoading() {
       p={{ base: "md", sm: "lg" }}
       radius="md"
     >
-      <Stack gap="sm" aria-hidden="true">
-        {Array.from({ length: 6 }, (_, index) => (
-          <div className="search-result-row search-result-skeleton" key={index}>
-            <Skeleton className="search-result-thumb" radius="sm" />
-            <Stack className="search-result-content" gap="xs">
-              <Skeleton height={18} radius="xl" />
-              <Skeleton height={14} width="42%" radius="xl" />
-              <Skeleton height={14} width="64%" radius="xl" />
-            </Stack>
-          </div>
+      <div className="media-grid search-loading-grid" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, index) => (
+          <Stack className="search-result-skeleton-card" gap="xs" key={index}>
+            <Skeleton className="search-result-skeleton-preview" radius="sm" />
+            <Skeleton height={18} radius="xl" />
+            <Skeleton height={14} width="54%" radius="xl" />
+            <Skeleton height={14} width="72%" radius="xl" />
+          </Stack>
         ))}
-      </Stack>
+      </div>
     </Paper>
   );
 }

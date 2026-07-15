@@ -1,8 +1,10 @@
-import { Divider, Paper, Stack, Text, Title } from "@mantine/core";
-import { useEffect, useRef } from "react";
+import { Collapse, Divider, Paper, Stack, Text, Title } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { useEffect, useRef, useState } from "react";
 import { SearchFilters } from "../components/search/SearchFilters";
 import { SearchForm } from "../components/search/SearchForm";
 import { SearchResults } from "../components/search/SearchResults";
+import { SearchSummary } from "../components/search/SearchSummary";
 import { useSearchForm } from "../hooks/useSearchForm";
 import { useRedditSearch } from "../hooks/useRedditSearch";
 import "../styles/search.css";
@@ -18,7 +20,10 @@ export function SearchPage() {
     clearFilters
   } = useSearchForm();
   const { state, runSearch, retrySearch, loadMore } = useRedditSearch();
+  const isMobile = useMediaQuery("(max-width: 40em)");
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const lastSubmitRevisionRef = useRef(submitRevision);
+  const keywordInputRef = useRef(null);
 
   useEffect(() => {
     if (!submittedValues) {
@@ -40,45 +45,85 @@ export function SearchPage() {
     };
   }, [submittedValues, submitRevision, runSearch]);
 
+  useEffect(() => {
+    if (!isMobile) {
+      setFiltersExpanded(true);
+      return;
+    }
+
+    if (values.validationError || state.status === "error" || state.status === "idle") {
+      setFiltersExpanded(true);
+      return;
+    }
+
+    if (state.status === "success" || state.status === "empty") {
+      setFiltersExpanded(false);
+    }
+  }, [isMobile, state.status, values.validationError]);
+
+  const handleEditFilters = () => {
+    setFiltersExpanded(true);
+    window.setTimeout(() => keywordInputRef.current?.focus(), 0);
+  };
+
+  const showCollapsedSummary =
+    isMobile &&
+    !filtersExpanded &&
+    (state.status === "success" || state.status === "empty");
+
   return (
     <Stack className="search-page" gap="md">
-      <Paper
-        className="search-controls-panel"
-        component="section"
-        aria-labelledby="search-page-title"
-        withBorder
-        shadow="xs"
-        p={{ base: "md", sm: "lg" }}
-        radius="md"
-      >
-        <Stack gap="md">
-          <Stack gap={4}>
-            <Title id="search-page-title" order={2} size="h3">
-              Search Reddit media
-            </Title>
-            <Text className="search-page-description" c="gray.6">
-              Find images, videos, GIFs, galleries, and external media links.
-            </Text>
-          </Stack>
-
-          <SearchForm
+      <div className="search-controls-container">
+        {showCollapsedSummary ? (
+          <SearchSummary
             values={values}
-            onFieldChange={setFieldValue}
-            onSubmit={submitSearch}
+            resultCount={state.items.length}
+            onEdit={handleEditFilters}
           />
+        ) : null}
 
-          <Divider />
+        <Collapse in={!showCollapsedSummary || filtersExpanded}>
+          <Paper
+            className="search-controls-panel"
+            component="section"
+            aria-labelledby="search-page-title"
+            withBorder
+            p={{ base: "md", sm: "lg" }}
+            radius="md"
+          >
+            <Stack gap="sm">
+              <Stack gap={3}>
+                <Title id="search-page-title" order={2} size="h4">
+                  Search Reddit media
+                </Title>
+                <Text className="search-page-description" size="sm" c="gray.6">
+                  Find images, videos, GIFs, galleries, and external media links.
+                </Text>
+              </Stack>
 
-          <SearchFilters values={values} onFieldChange={setFieldValue} />
-        </Stack>
-      </Paper>
+              <SearchForm
+                values={values}
+                onFieldChange={setFieldValue}
+                onSubmit={submitSearch}
+                keywordInputRef={keywordInputRef}
+              />
 
-      <SearchResults
-        state={state}
-        onRetry={retrySearch}
-        onLoadMore={loadMore}
-        onClearFilters={clearFilters}
-      />
+              <Divider />
+
+              <SearchFilters values={values} onFieldChange={setFieldValue} />
+            </Stack>
+          </Paper>
+        </Collapse>
+      </div>
+
+      <div className="search-results-container">
+        <SearchResults
+          state={state}
+          onRetry={retrySearch}
+          onLoadMore={loadMore}
+          onClearFilters={clearFilters}
+        />
+      </div>
     </Stack>
   );
 }

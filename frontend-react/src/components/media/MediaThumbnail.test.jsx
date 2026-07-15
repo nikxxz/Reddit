@@ -23,6 +23,6 @@ describe("MediaThumbnail", () => {
 
     fireEvent.error(screen.getByAltText("Image preview for Example image"));
 
-    expect(screen.getByText("Preview unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Image preview unavailable")).toBeInTheDocument();
   });
 });

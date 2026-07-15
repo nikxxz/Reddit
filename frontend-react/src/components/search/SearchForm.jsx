@@ -1,6 +1,6 @@
 import { Button, Group, Stack, Text, TextInput } from "@mantine/core";
 
-export function SearchForm({ values, onFieldChange, onSubmit }) {
+export function SearchForm({ values, onFieldChange, onSubmit, keywordInputRef }) {
   const hasError = Boolean(values.validationError);
 
   return (
@@ -13,6 +13,7 @@ export function SearchForm({ values, onFieldChange, onSubmit }) {
         <Group className="search-form-row" align="flex-end" gap="sm">
           <TextInput
             className="search-keyword-input"
+            ref={keywordInputRef}
             label="Keyword"
             placeholder="Search Reddit media"
             value={values.query}

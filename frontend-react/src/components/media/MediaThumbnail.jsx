@@ -58,15 +58,30 @@ export function MediaThumbnail({
           />
         </>
       ) : (
-        <Stack className="media-thumbnail-fallback" gap={6} align="center" justify="center">
-          <ThemeIcon color="gray" radius="xl" size="lg" variant="light">
-            <MediaIcon type={item.media_type} />
-          </ThemeIcon>
-          <Text size="xs" c="gray.6" ta="center">
-            Preview unavailable
-          </Text>
-        </Stack>
+        <MediaFallback type={item.media_type} />
       )}
     </div>
+  );
+}
+
+export function MediaFallback({ type = "image", label }) {
+  const fallbackLabel = label || `${getMediaTypeLabel(type)} preview unavailable`;
+
+  return (
+    <Stack
+      className="media-thumbnail-fallback"
+      gap={6}
+      align="center"
+      justify="center"
+      role="img"
+      aria-label={fallbackLabel}
+    >
+      <ThemeIcon color="gray" radius="xl" size="lg" variant="light">
+        <MediaIcon type={type} />
+      </ThemeIcon>
+      <Text size="xs" c="gray.6" ta="center">
+        {fallbackLabel}
+      </Text>
+    </Stack>
   );
 }

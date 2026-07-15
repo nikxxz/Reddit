@@ -7,7 +7,10 @@ import { SearchError } from "./SearchError";
 import { SearchLoading } from "./SearchLoading";
 
 const MEDIA_LABELS = {
-  all: "Media",
+  all: "All media",
+  images: "Images",
+  videos: "Videos",
+  gifs: "GIFs",
   image: "Images",
   video: "Videos",
   gif: "GIFs",
@@ -22,6 +25,14 @@ const SORT_LABELS = {
   hot: "Hot"
 };
 
+const TIME_LABELS = {
+  all: "All time",
+  day: "Today",
+  week: "This week",
+  month: "This month",
+  year: "This year"
+};
+
 function getIdleSummary() {
   return {
     title: "Search results will appear here.",
@@ -29,28 +40,32 @@ function getIdleSummary() {
   };
 }
 
-function getSuccessSummary(state) {
+function getResultsSummary(state) {
   const request = state.lastRequest || {};
   const meta = state.responseMeta || {};
   const query = request.query;
   const subreddit = meta.subreddit || request.subreddit;
   const mediaType = MEDIA_LABELS[meta.mediaType] || MEDIA_LABELS[request.mediaType] || "Media";
   const sort = SORT_LABELS[meta.effectiveSort] || SORT_LABELS[request.sortBy];
+  const time = TIME_LABELS[meta.timeFilter] || TIME_LABELS[request.timeFilter];
+  const resultCount = Number.isFinite(meta.count) && meta.count > state.items.length
+    ? meta.count
+    : state.items.length;
+  const title = query && subreddit
+    ? `${query} in r/${subreddit}`
+    : query
+      ? query
+      : subreddit
+        ? `Browsing r/${subreddit}`
+        : "Reddit media results";
+  const detail = [
+    mediaType,
+    sort,
+    time,
+    request.includeNsfw ? "NSFW included" : "NSFW off"
+  ].filter(Boolean).join(" - ");
 
-  if (query && subreddit) {
-    return `Showing results for "${query}" in r/${subreddit}`;
-  }
-
-  if (query) {
-    return `Showing results for "${query}"`;
-  }
-
-  if (subreddit) {
-    const suffix = sort ? ` - Sorted by ${sort}` : "";
-    return `Browsing ${mediaType} from r/${subreddit}${suffix}`;
-  }
-
-  return "Showing Reddit media results";
+  return { title, detail, resultCount };
 }
 
 function IdlePlaceholder() {
@@ -77,6 +92,7 @@ function IdlePlaceholder() {
 
 function ResultsList({ state, onLoadMore }) {
   const { opened, selectedItem, openPreview, closePreview } = useMediaPreview();
+  const summary = getResultsSummary(state);
 
   return (
     <>
@@ -89,12 +105,15 @@ function ResultsList({ state, onLoadMore }) {
         radius="md"
       >
         <Stack gap="md">
-          <Stack gap={2}>
-            <Text fw={600}>{getSuccessSummary(state)}</Text>
+          <div className="search-results-header">
+            <Text fw={700} lineClamp={1}>{summary.title}</Text>
             <Text size="sm" c="gray.6">
-              {state.items.length} result{state.items.length === 1 ? "" : "s"}
+              {summary.detail}
             </Text>
-          </Stack>
+            <Text className="search-results-count" size="sm" fw={700}>
+              {summary.resultCount} result{summary.resultCount === 1 ? "" : "s"}
+            </Text>
+          </div>
           <MediaGrid
             items={state.items}
             isLoadingMore={state.isLoadingMore}

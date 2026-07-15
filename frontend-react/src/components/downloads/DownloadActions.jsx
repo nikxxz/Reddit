@@ -7,7 +7,8 @@ const TERMINAL_STATUSES = new Set(["completed", "completed_with_errors", "failed
 export function DownloadActions({
   item,
   downloadJob,
-  createPayload
+  createPayload,
+  className = ""
 }) {
   const isGallery = item?.media_type === "gallery";
   const isActive = downloadJob.isActive;
@@ -22,8 +23,8 @@ export function DownloadActions({
   };
 
   return (
-    <Stack gap="sm">
-      <Group gap="sm">
+    <Stack className={`download-actions ${className}`} gap="sm">
+      <Group className="download-actions-buttons" gap="sm">
         <Button
           leftSection={<IconDownload size={16} stroke={1.8} />}
           disabled={isActive}

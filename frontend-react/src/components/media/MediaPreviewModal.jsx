@@ -13,10 +13,15 @@ import {
   getThumbnailUrl,
   isVideoUrl
 } from "./MediaMetadata";
-import { MediaThumbnail } from "./MediaThumbnail";
+import { MediaFallback, MediaThumbnail } from "./MediaThumbnail";
 
 function PreviewContent({ item, activeGalleryIndex, onGallerySlideChange }) {
   const url = getPrimaryMediaUrl(item);
+  const [videoFailed, setVideoFailed] = useState(false);
+
+  useEffect(() => {
+    setVideoFailed(false);
+  }, [item.id, url]);
 
   if (item.media_type === "gallery") {
     return (
@@ -28,16 +33,22 @@ function PreviewContent({ item, activeGalleryIndex, onGallerySlideChange }) {
     );
   }
 
-  if (item.media_type === "video" && url && isVideoUrl(url)) {
+  if (item.media_type === "video" && url && isVideoUrl(url) && !videoFailed) {
     return (
-      <video className="media-preview-video" controls preload="metadata">
+      <video
+        className="media-preview-video"
+        controls
+        preload="metadata"
+        poster={getThumbnailUrl(item) || undefined}
+        onError={() => setVideoFailed(true)}
+      >
         <source src={url} />
         Video preview unavailable.
       </video>
     );
   }
 
-  if (item.media_type === "gif" && url && isVideoUrl(url)) {
+  if (item.media_type === "gif" && url && isVideoUrl(url) && !videoFailed) {
     return (
       <video
         className="media-preview-video"
@@ -46,6 +57,8 @@ function PreviewContent({ item, activeGalleryIndex, onGallerySlideChange }) {
         muted
         playsInline
         preload="metadata"
+        poster={getThumbnailUrl(item) || undefined}
+        onError={() => setVideoFailed(true)}
       >
         <source src={url} />
         GIF preview unavailable.
@@ -54,21 +67,18 @@ function PreviewContent({ item, activeGalleryIndex, onGallerySlideChange }) {
   }
 
   if (item.media_type === "video") {
-    return (
-      <Stack className="media-preview-fallback" gap="xs" align="center" justify="center">
-        <Text fw={700}>Video preview unavailable</Text>
-        <Text size="sm" c="gray.5" ta="center">
-          Open the Reddit post to view this media.
-        </Text>
-      </Stack>
-    );
+    return <MediaFallback type="video" />;
+  }
+
+  if (item.media_type === "gif") {
+    return <MediaFallback type="gif" />;
   }
 
   if (item.media_type === "external") {
     return (
       <Stack className="media-preview-fallback" gap="xs" align="center" justify="center">
         <MediaThumbnail item={item} src={getThumbnailUrl(item)} contain />
-        <Text fw={700}>External media</Text>
+        <Text fw={700}>External preview unavailable</Text>
       </Stack>
     );
   }
@@ -128,7 +138,7 @@ export function MediaPreviewModal({ opened, item, onClose }) {
             />
           </div>
 
-          <Stack gap="xs">
+          <Stack className="media-preview-details" gap="xs">
             <Group gap="xs">
               <Badge variant="light">{getMediaTypeLabel(item.media_type)}</Badge>
               {item.is_nsfw ? (
@@ -153,23 +163,27 @@ export function MediaPreviewModal({ opened, item, onClose }) {
                 {metadata.join(" - ")}
               </Text>
             ) : null}
-            {redditUrl ? (
-              <Button
-                className="media-preview-reddit-link"
-                component="a"
-                href={redditUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                leftSection={<IconExternalLink size={16} stroke={1.8} />}
-              >
-                Open on Reddit
-              </Button>
-            ) : null}
-            <DownloadActions
-              item={item}
-              downloadJob={downloadJob}
-              createPayload={createDownloadPayload}
-            />
+            <div className="media-preview-actions">
+              {redditUrl ? (
+                <Button
+                  className="media-preview-reddit-link"
+                  component="a"
+                  href={redditUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  leftSection={<IconExternalLink size={16} stroke={1.8} />}
+                  variant="subtle"
+                >
+                  Open on Reddit
+                </Button>
+              ) : null}
+              <DownloadActions
+                item={item}
+                downloadJob={downloadJob}
+                createPayload={createDownloadPayload}
+                className="media-preview-download-actions"
+              />
+            </div>
           </Stack>
         </Stack>
       ) : null}
