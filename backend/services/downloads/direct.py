@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import threading
 from pathlib import Path
 from time import monotonic
 from time import sleep
+from typing import Callable
 from urllib.parse import urlparse
 
 import httpx
 
 from backend.config import settings
-from backend.services.downloads.errors import DownloadError, UrlSafetyError
-from backend.services.downloads.filenames import safe_filename_from_url
+from backend.services.downloads.errors import DownloadCancelled, DownloadError, UrlSafetyError
+from backend.services.downloads.filenames import safe_filename_from_url, unique_path
 
+
+ProgressCallback = Callable[[int, int | None], None]
 
 ALLOWED_DIRECT_HOSTS = {
     "i.redd.it",
@@ -57,10 +61,12 @@ def download_direct_url(
     output_dir: Path,
     filename: str | None = None,
     max_size_bytes: int | None = None,
+    progress_callback: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
     validate_download_url(url)
     output_dir.mkdir(parents=True, exist_ok=True)
-    final_path = output_dir / (filename or safe_filename_from_url(url))
+    final_path = unique_path(output_dir, filename or safe_filename_from_url(url))
     part_path = final_path.with_suffix(final_path.suffix + ".part")
     deadline = monotonic() + settings.download_total_timeout
     timeout = httpx.Timeout(
@@ -73,7 +79,16 @@ def download_direct_url(
     try:
         for attempt in range(settings.max_download_retries + 1):
             try:
-                return _stream_to_file(url, final_path, part_path, timeout, max_size_bytes, deadline)
+                return _stream_to_file(
+                    url,
+                    final_path,
+                    part_path,
+                    timeout,
+                    max_size_bytes,
+                    deadline,
+                    progress_callback,
+                    cancel_event,
+                )
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code not in {429, 500, 502, 503, 504} or attempt >= settings.max_download_retries:
                     raise
@@ -92,6 +107,9 @@ def download_direct_url(
         if exc.response.status_code == 429:
             raise DownloadError("The download host rejected the request.") from exc
         raise DownloadError("The download host rejected the request.") from exc
+    except DownloadCancelled:
+        _cleanup_part(part_path)
+        raise
     except Exception:
         _cleanup_part(part_path)
         raise
@@ -106,6 +124,8 @@ def _stream_to_file(
     timeout: httpx.Timeout,
     max_size_bytes: int | None,
     deadline: float,
+    progress_callback: ProgressCallback | None,
+    cancel_event: threading.Event | None,
 ) -> Path:
     bytes_written = 0
     with httpx.stream("GET", url, timeout=timeout, follow_redirects=True) as response:
@@ -113,16 +133,23 @@ def _stream_to_file(
         content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
         if not _valid_content_type(content_type):
             raise DownloadError("The selected media could not be resolved.")
+        content_length = _safe_int(response.headers.get("content-length"))
+        if max_size_bytes is not None and content_length and content_length > max_size_bytes:
+            raise DownloadError("The selected media is too large.")
         with part_path.open("wb") as file:
             for chunk in response.iter_bytes():
+                if cancel_event and cancel_event.is_set():
+                    raise DownloadCancelled("The download was cancelled.")
                 if monotonic() > deadline:
                     raise httpx.TimeoutException("download total timeout exceeded")
                 if not chunk:
                     continue
                 bytes_written += len(chunk)
                 if max_size_bytes is not None and bytes_written > max_size_bytes:
-                    raise DownloadError("The selected media could not be resolved.")
+                    raise DownloadError("The selected media is too large.")
                 file.write(chunk)
+                if progress_callback:
+                    progress_callback(bytes_written, content_length)
     part_path.replace(final_path)
     return final_path
 
@@ -144,3 +171,10 @@ def _cleanup_part(part_path: Path) -> None:
         part_path.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _safe_int(value: str | None) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except ValueError:
+        return None

@@ -4,3 +4,7 @@ class DownloadError(RuntimeError):
 
 class UrlSafetyError(DownloadError):
     pass
+
+
+class DownloadCancelled(DownloadError):
+    pass

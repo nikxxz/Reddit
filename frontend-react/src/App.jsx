@@ -5,6 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { useRedditAuth } from "./hooks/useRedditAuth";
 import "./styles/app.css";
 import "./styles/account.css";
+import "./styles/media-results.css";
 
 const CHECKING_STATE = {
   backend: {

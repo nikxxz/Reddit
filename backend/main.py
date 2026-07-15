@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.routes.auth import router as auth_router
+from backend.routes.downloads import router as downloads_router
 from backend.routes.health import router as health_router
 from backend.routes.reddit import router as reddit_router
 from backend.services.reddit.oauth import reddit_oauth_manager
@@ -17,6 +18,7 @@ app = FastAPI(title=settings.app_name)
 app.include_router(health_router, prefix="/api")
 app.include_router(reddit_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(downloads_router, prefix="/api")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 REACT_DIST = BASE_DIR / "frontend-react" / "dist"

@@ -1,9 +1,10 @@
 import { Paper, Stack, Text } from "@mantine/core";
-import { LoadMoreButton } from "./LoadMoreButton";
+import { MediaGrid } from "../media/MediaGrid";
+import { MediaPreviewModal } from "../media/MediaPreviewModal";
+import { useMediaPreview } from "../../hooks/useMediaPreview";
 import { SearchEmpty } from "./SearchEmpty";
 import { SearchError } from "./SearchError";
 import { SearchLoading } from "./SearchLoading";
-import { SearchResultItem } from "./SearchResultItem";
 
 const MEDIA_LABELS = {
   all: "Media",
@@ -75,38 +76,41 @@ function IdlePlaceholder() {
 }
 
 function ResultsList({ state, onLoadMore }) {
-  const hasLoadMore = state.items.length > 0 && state.nextAfter;
+  const { opened, selectedItem, openPreview, closePreview } = useMediaPreview();
 
   return (
-    <Paper
-      className="search-results-panel"
-      component="section"
-      aria-live="polite"
-      withBorder
-      p={{ base: "md", sm: "lg" }}
-      radius="md"
-    >
-      <Stack gap="md">
-        <Stack gap={2}>
-          <Text fw={600}>{getSuccessSummary(state)}</Text>
-          <Text size="sm" c="gray.6">
-            {state.items.length} result{state.items.length === 1 ? "" : "s"}
-          </Text>
-        </Stack>
-        <Stack gap="sm">
-          {state.items.map((item) => (
-            <SearchResultItem item={item} key={item.id} />
-          ))}
-        </Stack>
-        {hasLoadMore ? (
-          <LoadMoreButton
+    <>
+      <Paper
+        className="search-results-panel"
+        component="section"
+        aria-live="polite"
+        withBorder
+        p={{ base: "md", sm: "lg" }}
+        radius="md"
+      >
+        <Stack gap="md">
+          <Stack gap={2}>
+            <Text fw={600}>{getSuccessSummary(state)}</Text>
+            <Text size="sm" c="gray.6">
+              {state.items.length} result{state.items.length === 1 ? "" : "s"}
+            </Text>
+          </Stack>
+          <MediaGrid
+            items={state.items}
             isLoadingMore={state.isLoadingMore}
             loadMoreError={state.loadMoreError}
+            nextAfter={state.nextAfter}
             onLoadMore={onLoadMore}
+            onOpenPreview={openPreview}
           />
-        ) : null}
-      </Stack>
-    </Paper>
+        </Stack>
+      </Paper>
+      <MediaPreviewModal
+        opened={opened}
+        item={selectedItem}
+        onClose={closePreview}
+      />
+    </>
   );
 }
 
