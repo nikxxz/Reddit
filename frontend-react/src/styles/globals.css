@@ -51,3 +51,11 @@ button:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}

@@ -88,6 +88,32 @@ class DirectDownloadTests(unittest.TestCase):
                 path = download_direct_url("https://i.redd.it/example.jpg", Path(tmpdir))
             self.assertTrue(path.exists())
 
+    def test_direct_mp4_download(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("socket.getaddrinfo", public_dns), patch(
+                "httpx.stream", return_value=FakeStream(chunks=[b"video"], content_type="video/mp4")
+            ):
+                path = download_direct_url("https://v.redd.it/example.mp4", Path(tmpdir))
+            self.assertEqual(path.name, "example.mp4")
+
+    def test_oversized_file_rejection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            with patch("socket.getaddrinfo", public_dns), patch(
+                "httpx.stream",
+                return_value=FakeStream(
+                    chunks=[b"too-large"],
+                    headers={"content-length": "999"},
+                ),
+            ):
+                with self.assertRaises(DownloadError):
+                    download_direct_url(
+                        "https://i.redd.it/example.jpg",
+                        output_dir,
+                        max_size_bytes=1,
+                    )
+            self.assertFalse((output_dir / "example.jpg.part").exists())
+
     def test_invalid_content_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("socket.getaddrinfo", public_dns), patch(

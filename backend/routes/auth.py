@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
@@ -12,9 +14,13 @@ logger = get_logger(__name__)
 
 
 @router.get("/reddit/auth/login")
-def reddit_auth_login() -> dict[str, str]:
+def reddit_auth_login(frontend_origin: str | None = Query(default=None)) -> dict[str, str]:
     try:
-        return {"url": reddit_oauth_manager.create_authorization_url()}
+        safe_origin = _safe_frontend_origin(frontend_origin)
+        authorization_url = reddit_oauth_manager.create_authorization_url(
+            frontend_origin=safe_origin
+        )
+        return {"url": authorization_url, "authorization_url": authorization_url}
     except Exception as exc:
         logger.warning("reddit.oauth.login.failed error_type=%s", exc.__class__.__name__)
         raise HTTPException(status_code=502, detail="Unable to connect Reddit account.") from None
@@ -26,17 +32,33 @@ def reddit_auth_callback(
     state: str | None = Query(default=None),
     error: str | None = Query(default=None),
 ) -> HTMLResponse:
+    target_origin = reddit_oauth_manager.get_state_frontend_origin(state)
     try:
         reddit_oauth_manager.handle_callback(code=code, state=state, error=error)
-        return HTMLResponse(_callback_page("Authentication successful", "This window can now be closed.", True))
+        return HTMLResponse(
+            _callback_page(
+                "Reddit account connected successfully.",
+                "You may close this window.",
+                True,
+                target_origin,
+            )
+        )
     except ValueError as exc:
         message = str(exc) or "Unable to connect Reddit account."
         logger.warning("reddit.oauth.callback.failed reason=%s", message)
-        return HTMLResponse(_callback_page(message, "Return to the app and try again.", False), status_code=400)
+        return HTMLResponse(
+            _callback_page(message, "Return to the app and try again.", False, target_origin),
+            status_code=400,
+        )
     except Exception as exc:
         logger.warning("reddit.oauth.callback.failed error_type=%s", exc.__class__.__name__)
         return HTMLResponse(
-            _callback_page("Unable to connect Reddit account.", "Retry later from the app.", False),
+            _callback_page(
+                "Unable to connect Reddit account.",
+                "Retry later from the app.",
+                False,
+                target_origin,
+            ),
             status_code=502,
         )
 
@@ -55,12 +77,34 @@ def reddit_auth_status() -> dict[str, object]:
 
 @router.post("/reddit/auth/logout")
 def reddit_auth_logout() -> dict[str, bool]:
-    reddit_oauth_manager.logout()
-    return {"success": True}
+    try:
+        reddit_oauth_manager.logout()
+        return {"success": True}
+    except Exception as exc:
+        logger.warning("reddit.oauth.logout.failed error_type=%s", exc.__class__.__name__)
+        raise HTTPException(status_code=502, detail="Unable to disconnect Reddit account.") from None
 
 
-def _callback_page(title: str, detail: str, success: bool) -> str:
-    event_type = "reddit-auth-success" if success else "reddit-auth-error"
+def _safe_frontend_origin(origin: str | None) -> str | None:
+    if not origin:
+        return None
+
+    parsed = urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _callback_page(
+    title: str,
+    detail: str,
+    success: bool,
+    target_origin: str | None,
+) -> str:
+    event_type = "reddit-oauth-success" if success else "reddit-oauth-error"
+    post_target = target_origin or "window.location.origin"
+    quoted_target = f'"{post_target}"' if target_origin else post_target
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -80,7 +124,7 @@ def _callback_page(title: str, detail: str, success: bool) -> str:
     </main>
     <script>
       if (window.opener) {{
-        window.opener.postMessage({{ type: "{event_type}" }}, window.location.origin);
+        window.opener.postMessage({{ type: "{event_type}" }}, {quoted_target});
       }}
       window.setTimeout(() => window.close(), 700);
     </script>
