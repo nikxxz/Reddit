@@ -63,6 +63,7 @@ export function useDownloadJob() {
 
         if (TERMINAL_STATUSES.has(status.status)) {
           stopPolling();
+          refreshJobs();
         }
       } catch {
         setState((current) => ({
@@ -73,7 +74,7 @@ export function useDownloadJob() {
         stopPolling();
       }
     },
-    [stopPolling]
+    [refreshJobs, stopPolling]
   );
 
   const beginPolling = useCallback(

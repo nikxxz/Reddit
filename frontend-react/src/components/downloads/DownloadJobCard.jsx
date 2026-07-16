@@ -1,6 +1,6 @@
 import { Collapse, Group, Image, Paper, Stack, Text, ThemeIcon, UnstyledButton } from "@mantine/core";
 import { IconAlertTriangle, IconFile, IconPhoto } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DownloadJobActions } from "./DownloadJobActions";
 import { DownloadJobProgress } from "./DownloadJobProgress";
 import { DownloadStatusBadge } from "./DownloadStatusBadge";
@@ -63,6 +63,10 @@ export function DownloadJobCard({
     MEDIA_LABELS[job.mediaType] || "Media",
     timestamp
   ].filter(Boolean);
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [job.thumbnailUrl]);
 
   return (
     <Paper className="download-job-card" withBorder p="md">

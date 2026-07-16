@@ -99,6 +99,12 @@ def get_download_id_for_job(job_id: str) -> str | None:
         return str(row["id"]) if row else None
 
 
+def get_download_for_job(job_id: str) -> sqlite3.Row | None:
+    _ensure_schema()
+    with get_connection() as connection:
+        return connection.execute("SELECT * FROM downloads WHERE job_id = ?", (job_id,)).fetchone()
+
+
 def add_file_record(
     *,
     job_id: str,

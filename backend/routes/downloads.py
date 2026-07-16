@@ -20,6 +20,7 @@ from backend.utils.logging import get_logger
 
 router = APIRouter(tags=["downloads"])
 logger = get_logger(__name__)
+TERMINAL_STATUSES = {"completed", "completed_with_errors", "failed", "cancelled"}
 
 
 @router.get("/downloads", response_model=DownloadJobListResponse)
@@ -32,8 +33,11 @@ def list_downloads(
     started = monotonic()
     logger.info("download.jobs.list.start status_filter=%s", status)
     try:
-        active_jobs = download_job_manager.list_jobs(status)
-        active_job_ids = {job.job_id for job in active_jobs}
+        active_jobs = [
+            _summary_with_persisted_state(job)
+            for job in download_job_manager.list_jobs(status)
+        ]
+        active_job_ids = {_summary_job_id(job) for job in active_jobs}
         historical = []
         if status != "active":
             historical = [
@@ -177,3 +181,18 @@ def _history_summary(row) -> object:
         "cancellable": False,
         "retryable": row["status"] in {"failed", "cancelled"} or row["availability"] in {"missing", "partially_available"},
     }
+
+
+def _summary_with_persisted_state(job) -> object:
+    if job.status not in TERMINAL_STATUSES:
+        return job
+    row = downloads_repo.get_download_for_job(job.job_id)
+    if row is None:
+        return job
+    return _history_summary(row)
+
+
+def _summary_job_id(job) -> str:
+    if isinstance(job, dict):
+        return str(job["job_id"])
+    return str(job.job_id)

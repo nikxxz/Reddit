@@ -1,5 +1,5 @@
 import { Button, Group, Modal, Select, SegmentedControl, Stack, Text } from "@mantine/core";
-import { IconTrash } from "@tabler/icons-react";
+import { IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import { useState } from "react";
 
 const FILTERS = [
@@ -14,16 +14,24 @@ const FILTERS = [
 export function DownloadsToolbar({
   filter,
   terminalJobCount,
+  failedJobCount,
   clearPending,
+  clearFailedPending,
   onFilterChange,
-  onClearFinished
+  onClearFinished,
+  onClearFailed
 }) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmMode, setConfirmMode] = useState(null);
+  const confirmOpen = Boolean(confirmMode);
+  const isFailedMode = confirmMode === "failed";
+  const confirmTitle = isFailedMode ? "Clear failed download records?" : "Clear finished download records?";
+  const confirmAction = isFailedMode ? onClearFailed : onClearFinished;
+  const confirmPending = isFailedMode ? clearFailedPending : clearPending;
 
   const handleClear = async () => {
-    const result = await onClearFinished();
+    const result = await confirmAction();
     if (result) {
-      setConfirmOpen(false);
+      setConfirmMode(null);
     }
   };
 
@@ -47,10 +55,19 @@ export function DownloadsToolbar({
         />
         <Button
           variant="light"
+          color="yellow"
+          leftSection={<IconAlertTriangle size={16} stroke={1.8} />}
+          disabled={!failedJobCount}
+          onClick={() => setConfirmMode("failed")}
+        >
+          Clear failed
+        </Button>
+        <Button
+          variant="light"
           color="red"
           leftSection={<IconTrash size={16} stroke={1.8} />}
           disabled={!terminalJobCount}
-          onClick={() => setConfirmOpen(true)}
+          onClick={() => setConfirmMode("finished")}
         >
           Clear finished
         </Button>
@@ -58,17 +75,21 @@ export function DownloadsToolbar({
 
       <Modal
         opened={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        title="Clear finished download records?"
+        onClose={() => setConfirmMode(null)}
+        title={confirmTitle}
         centered
       >
         <Stack gap="md">
-          <Text size="sm">Downloaded files will not be deleted.</Text>
+          <Text size="sm">
+            {isFailedMode
+              ? "Only failed download records will be removed. Downloaded files will not be deleted."
+              : "Downloaded files will not be deleted."}
+          </Text>
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setConfirmOpen(false)}>
+            <Button variant="default" onClick={() => setConfirmMode(null)}>
               Cancel
             </Button>
-            <Button color="red" loading={clearPending} onClick={handleClear}>
+            <Button color={isFailedMode ? "yellow" : "red"} loading={confirmPending} onClick={handleClear}>
               Clear records
             </Button>
           </Group>

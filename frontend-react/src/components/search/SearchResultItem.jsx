@@ -1,5 +1,5 @@
 import { Badge, Image, Paper, Stack, Text } from "@mantine/core";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const MEDIA_LABELS = {
   image: "Image",
@@ -32,6 +32,10 @@ export function SearchResultItem({ item }) {
   const [hasImageError, setHasImageError] = useState(false);
   const mediaLabel = MEDIA_LABELS[item.media_type] || "Media";
   const hasThumbnail = Boolean(item.thumbnail_url) && !hasImageError;
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [item.thumbnail_url]);
 
   return (
     <Paper className="search-result-row" withBorder p="sm" radius="md">

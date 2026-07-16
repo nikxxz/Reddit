@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   cancelDownload,
+  clearDownloads,
   clearTerminalDownloads,
   listDownloads,
   retryDownload
@@ -66,7 +67,9 @@ export function DownloadJobsProvider({ children }) {
   }, [jobs]);
 
   const refreshJobs = useCallback(async ({ signal } = {}) => {
-    requestRef.current?.abort();
+    if (requestRef.current) {
+      return;
+    }
     const controller = new AbortController();
     requestRef.current = controller;
     const requestSignal = signal || controller.signal;
@@ -163,6 +166,16 @@ export function DownloadJobsProvider({ children }) {
     [runJobAction]
   );
 
+  const clearFailed = useCallback(
+    () =>
+      runJobAction(
+        "clear-failed",
+        () => clearDownloads(["failed"]),
+        "Unable to clear failed records."
+      ),
+    [runJobAction]
+  );
+
   const value = useMemo(
     () => ({
       jobs,
@@ -173,10 +186,12 @@ export function DownloadJobsProvider({ children }) {
       hasActiveJobs,
       pendingActions,
       terminalJobCount: jobs.filter((job) => TERMINAL_STATUSES.has(job.status)).length,
+      failedJobCount: jobs.filter((job) => job.status === "failed").length,
       refreshJobs,
       cancelJob,
       retryJob,
-      clearFinished
+      clearFinished,
+      clearFailed
     }),
     [
       jobs,
@@ -189,7 +204,8 @@ export function DownloadJobsProvider({ children }) {
       refreshJobs,
       cancelJob,
       retryJob,
-      clearFinished
+      clearFinished,
+      clearFailed
     ]
   );
 

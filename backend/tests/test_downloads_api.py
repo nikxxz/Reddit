@@ -4,6 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.config import settings
+from backend.database.repositories import downloads as downloads_repo
 from fastapi.testclient import TestClient
 
 from backend.main import app
@@ -52,6 +54,42 @@ class DownloadListApiTests(unittest.TestCase):
         self.assertNotIn("token=secret", serialized)
         self.assertNotIn(":\\", serialized)
 
+    def test_completed_live_job_uses_persisted_thumbnail_summary(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with patch.object(settings, "app_data_dir", str(root / "app-data")), patch.object(
+                settings, "download_dir", str(root / "downloads")
+            ), patch.object(settings, "database_filename", "reddit_media_library.sqlite3"):
+                downloads_repo._schema_ready = False
+                download_id = downloads_repo.create_download_record(
+                    job_id="job-1",
+                    post_id="abc123",
+                    title="Example",
+                    subreddit="pics",
+                    author="user",
+                    media_type="image",
+                    download_scope="single",
+                    status="completed",
+                )
+                downloads_repo.update_availability(download_id)
+                download_job_manager.jobs["job-1"] = DownloadJob(
+                    job_id="job-1",
+                    request=request(),
+                    status="completed",
+                    files=[{"filename": "pics_user_example.jpg", "category": "images", "status": "completed"}],
+                )
+
+                client = TestClient(app)
+                response = client.get("/api/downloads")
+
+                downloads_repo._schema_ready = False
+
+        self.assertEqual(response.status_code, 200)
+        job = response.json()["jobs"][0]
+        self.assertEqual(job["job_id"], "job-1")
+        self.assertEqual(job["id"], download_id)
+        self.assertEqual(job["thumbnail_url"], f"/api/library/thumbnails/{download_id}")
+
     def test_active_filter_works(self):
         download_job_manager.jobs["active"] = DownloadJob(
             job_id="active",
@@ -90,6 +128,57 @@ class DownloadListApiTests(unittest.TestCase):
             self.assertTrue(media.exists())
             self.assertNotIn("done", download_job_manager.jobs)
             self.assertIn("active", download_job_manager.jobs)
+
+    def test_clear_failed_removes_only_failed_records(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with patch.object(settings, "app_data_dir", str(root / "app-data")), patch.object(
+                settings, "download_dir", str(root / "downloads")
+            ), patch.object(settings, "database_filename", "reddit_media_library.sqlite3"):
+                downloads_repo._schema_ready = False
+                failed_id = downloads_repo.create_download_record(
+                    job_id="failed",
+                    post_id="failed-post",
+                    title="Failed",
+                    subreddit="pics",
+                    author="user",
+                    media_type="image",
+                    download_scope="single",
+                    status="failed",
+                )
+                completed_id = downloads_repo.create_download_record(
+                    job_id="completed",
+                    post_id="completed-post",
+                    title="Completed",
+                    subreddit="pics",
+                    author="user",
+                    media_type="image",
+                    download_scope="single",
+                    status="completed",
+                )
+                download_job_manager.jobs["failed"] = DownloadJob(
+                    job_id="failed",
+                    request=request("failed-post"),
+                    status="failed",
+                )
+                download_job_manager.jobs["completed"] = DownloadJob(
+                    job_id="completed",
+                    request=request("completed-post"),
+                    status="completed",
+                )
+
+                client = TestClient(app)
+                response = client.post("/api/downloads/clear", json={"statuses": ["failed"]})
+                rows = downloads_repo.list_downloads()
+
+                downloads_repo._schema_ready = False
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["removed"], 1)
+        self.assertNotIn("failed", download_job_manager.jobs)
+        self.assertIn("completed", download_job_manager.jobs)
+        self.assertNotIn(failed_id, {str(row["id"]) for row in rows})
+        self.assertIn(completed_id, {str(row["id"]) for row in rows})
 
     def test_duplicate_start_response_is_structured(self):
         client = TestClient(app)

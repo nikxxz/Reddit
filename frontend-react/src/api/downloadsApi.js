@@ -37,3 +37,11 @@ export function clearTerminalDownloads({ signal } = {}) {
     signal
   });
 }
+
+export function clearDownloads(statuses, { signal } = {}) {
+  return apiRequest("/api/downloads/clear", {
+    method: "POST",
+    body: { statuses },
+    signal
+  });
+}

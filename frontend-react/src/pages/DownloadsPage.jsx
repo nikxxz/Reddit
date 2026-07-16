@@ -15,10 +15,12 @@ export function DownloadsPage() {
     actionError,
     pendingActions,
     terminalJobCount,
+    failedJobCount,
     refreshJobs,
     cancelJob,
     retryJob,
-    clearFinished
+    clearFinished,
+    clearFailed
   } = useDownloads();
 
   return (
@@ -43,9 +45,12 @@ export function DownloadsPage() {
       <DownloadsToolbar
         filter={filter}
         terminalJobCount={terminalJobCount}
+        failedJobCount={failedJobCount}
         clearPending={Boolean(pendingActions.clear)}
+        clearFailedPending={Boolean(pendingActions["clear-failed"])}
         onFilterChange={setFilter}
         onClearFinished={clearFinished}
+        onClearFailed={clearFailed}
       />
 
       {error ? (

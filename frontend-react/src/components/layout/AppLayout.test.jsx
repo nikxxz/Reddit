@@ -13,6 +13,7 @@ vi.mock("../../api/redditSearchApi", () => ({
 vi.mock("../../api/downloadsApi", () => ({
   listDownloads: vi.fn(),
   cancelDownload: vi.fn(),
+  clearDownloads: vi.fn(),
   clearTerminalDownloads: vi.fn(),
   retryDownload: vi.fn()
 }));
