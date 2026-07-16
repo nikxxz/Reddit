@@ -1,6 +1,6 @@
 import { Alert, Button, Group, Paper, Popover, Stack, Text, Title } from "@mantine/core";
 import { IconAdjustmentsHorizontal, IconArrowLeft } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { searchRedditEntities } from "../api/redditEntities";
 import { EntityHeader } from "../components/entities/EntityHeader";
 import { EntitySearchForm } from "../components/entities/EntitySearchForm";
@@ -21,6 +21,14 @@ const ENTITY_INITIAL = {
   error: null
 };
 
+const MEDIA_OPTIONS = [
+  { value: "all", label: "All media", urlValue: "all" },
+  { value: "images", label: "Images", urlValue: "image" },
+  { value: "videos", label: "Videos", urlValue: "video" },
+  { value: "gifs", label: "GIFs", urlValue: "gif" },
+  { value: "gallery", label: "Gallery", urlValue: "gallery" }
+];
+
 const SUBREDDIT_SORTS = [
   { value: "hot", label: "Hot" },
   { value: "new", label: "New" },
@@ -30,9 +38,21 @@ const SUBREDDIT_SORTS = [
 
 const USER_SORTS = [
   { value: "new", label: "New" },
-  { value: "top", label: "Top" },
-  { value: "hot", label: "Hot" }
+  { value: "top", label: "Top" }
 ];
+
+const TIME_OPTIONS = [
+  { value: "hour", label: "Past hour" },
+  { value: "day", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+  { value: "year", label: "This year" },
+  { value: "all", label: "All time" }
+];
+
+const MEDIA_URL_TO_UI = new Map(
+  MEDIA_OPTIONS.flatMap((item) => [[item.value, item.value], [item.urlValue, item.value]])
+);
 
 function entityReducer(state, action) {
   if (action.type === "START") {
@@ -55,19 +75,25 @@ function entityReducer(state, action) {
 
 function queryFromFilters(filters) {
   const params = new URLSearchParams();
+  const mediaOption = MEDIA_OPTIONS.find((item) => item.value === filters.mediaType) || MEDIA_OPTIONS[0];
   params.set("sort", filters.sortBy);
   params.set("time", filters.timeFilter);
-  params.set("media", filters.mediaType);
+  params.set("media", mediaOption.urlValue);
   params.set("nsfw", filters.includeNsfw ? "true" : "false");
   return params.toString();
 }
 
 function filtersFromRoute(route) {
   const params = route?.query || new URLSearchParams();
+  const sortOptions = route?.entityType === "user" ? USER_SORTS : SUBREDDIT_SORTS;
+  const fallbackSort = route?.entityType === "user" ? "new" : "hot";
+  const rawSort = params.get("sort") || fallbackSort;
+  const sortBy = sortOptions.some((option) => option.value === rawSort) ? rawSort : fallbackSort;
+  const timeFilter = TIME_OPTIONS.some((option) => option.value === params.get("time")) ? params.get("time") : "all";
   return {
-    mediaType: params.get("media") || "all",
-    sortBy: params.get("sort") || (route?.entityType === "user" ? "new" : "hot"),
-    timeFilter: params.get("time") || "all",
+    mediaType: MEDIA_URL_TO_UI.get(params.get("media")) || "all",
+    sortBy,
+    timeFilter: sortBy === "top" ? timeFilter : "all",
     includeNsfw: params.get("nsfw") === "true"
   };
 }
@@ -79,7 +105,66 @@ function sameFilters(left, right) {
     left.includeNsfw === right.includeNsfw;
 }
 
+function labelFor(options, value, fallback = value) {
+  return options.find((option) => option.value === value)?.label || fallback;
+}
+
+function MediaResultSummary({ count, filters, sortOptions }) {
+  if (count <= 0) {
+    return null;
+  }
+  const parts = [
+    `${count} media ${count === 1 ? "item" : "items"}`,
+    labelFor(MEDIA_OPTIONS, filters.mediaType, "All media"),
+    labelFor(sortOptions, filters.sortBy)
+  ];
+  if (filters.sortBy === "top") {
+    parts.push(labelFor(TIME_OPTIONS, filters.timeFilter, "All time"));
+  }
+  if (filters.includeNsfw) {
+    parts.push("NSFW included");
+  }
+  return (
+    <Text className="entity-media-summary" size="sm" c="gray.6">
+      {parts.join(" · ")}
+    </Text>
+  );
+}
+
 export function EntityBrowserPage({ route, onNavigateEntity, onNavigateBrowse, onReplaceEntityQuery }) {
+  const [searchState, dispatchSearch] = useReducer(entityReducer, ENTITY_INITIAL);
+  const searchControllerRef = useRef(null);
+
+  const submitSearch = useCallback(async (query) => {
+    searchControllerRef.current?.abort();
+    const nextController = new AbortController();
+    searchControllerRef.current = nextController;
+    dispatchSearch({ type: "START", query });
+    try {
+      const response = await searchRedditEntities(query, { signal: nextController.signal });
+      dispatchSearch({
+        type: "SUCCESS",
+        query: response.query,
+        subreddits: response.subreddits,
+        users: response.users
+      });
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        dispatchSearch({
+          type: "ERROR",
+          query,
+          error: error.message || "Unable to search Reddit."
+        });
+      }
+    } finally {
+      if (searchControllerRef.current === nextController) {
+        searchControllerRef.current = null;
+      }
+    }
+  }, []);
+
+  useEffect(() => () => searchControllerRef.current?.abort(), []);
+
   if (route?.entityType && route?.entityName) {
     return (
       <EntityMediaPage
@@ -89,39 +174,10 @@ export function EntityBrowserPage({ route, onNavigateEntity, onNavigateBrowse, o
       />
     );
   }
-  return <EntitySearchPage onNavigateEntity={onNavigateEntity} />;
+  return <EntitySearchPage state={searchState} onSubmit={submitSearch} onNavigateEntity={onNavigateEntity} />;
 }
 
-function EntitySearchPage({ onNavigateEntity }) {
-  const [state, dispatch] = useReducer(entityReducer, ENTITY_INITIAL);
-  const [controller, setController] = useState(null);
-
-  const submit = useCallback(async (query) => {
-    controller?.abort();
-    const nextController = new AbortController();
-    setController(nextController);
-    dispatch({ type: "START", query });
-    try {
-      const response = await searchRedditEntities(query, { signal: nextController.signal });
-      dispatch({
-        type: "SUCCESS",
-        query: response.query,
-        subreddits: response.subreddits,
-        users: response.users
-      });
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        dispatch({
-          type: "ERROR",
-          query,
-          error: error.message || "Unable to search Reddit."
-        });
-      }
-    }
-  }, [controller]);
-
-  useEffect(() => () => controller?.abort(), [controller]);
-
+function EntitySearchPage({ state, onSubmit, onNavigateEntity }) {
   return (
     <Stack className="entity-browser-page" gap="md">
       <Paper className="entity-search-panel" component="section" withBorder p={{ base: "md", sm: "lg" }}>
@@ -130,7 +186,7 @@ function EntitySearchPage({ onNavigateEntity }) {
             <Title order={2} size="h3">Subreddits / Users</Title>
             <Text size="sm" c="gray.6">Search for a subreddit or Reddit user, then browse their media.</Text>
           </Stack>
-          <EntitySearchForm isLoading={state.status === "loading"} onSubmit={submit} />
+          <EntitySearchForm isLoading={state.status === "loading"} onSubmit={onSubmit} />
         </Stack>
       </Paper>
       <EntitySearchResults state={state} onOpenEntity={onNavigateEntity} />
@@ -148,9 +204,6 @@ function EntityMediaPage({ route, onNavigateBrowse, onReplaceEntityQuery }) {
 
   useEffect(() => {
     const next = filtersFromRoute(route);
-    if (route.entityType === "user" && next.sortBy === "rising") {
-      next.sortBy = "new";
-    }
     setFilters((current) => sameFilters(current, next) ? current : next);
   }, [route]);
 
@@ -202,6 +255,7 @@ function EntityMediaPage({ route, onNavigateBrowse, onReplaceEntityQuery }) {
         </Popover>
       </Group>
       <EntityHeader entity={state.entity} fallbackType={route.entityType} fallbackName={route.entityName} />
+      <MediaResultSummary count={state.items.length} filters={filters} sortOptions={sortOptions} />
       {state.status === "loading" ? <SearchLoading /> : null}
       {state.status === "error" ? (
         <Alert color="red" role="alert">{state.error}</Alert>

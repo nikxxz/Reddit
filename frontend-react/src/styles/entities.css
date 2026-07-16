@@ -25,6 +25,10 @@
   cursor: pointer;
 }
 
+.entity-media-summary {
+  line-height: 1.4;
+}
+
 .entity-result-avatar,
 .entity-header-image {
   width: 48px;

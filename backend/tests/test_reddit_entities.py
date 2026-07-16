@@ -1,8 +1,20 @@
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
+from unittest.mock import Mock
 
-from backend.api.errors import InvalidSubredditError, RedditSearchError
-from backend.services.reddit.entities import RedditEntityService, normalize_entity_query
+from fastapi.testclient import TestClient
+from prawcore import exceptions as prawcore_exceptions
+
+from backend.api.dependencies import get_reddit_entity_service
+from backend.api.errors import (
+    PrivateSubredditError,
+    RedditEntityNotFoundError,
+    RedditSearchError,
+    RedditUserSuspendedError,
+)
+from backend.main import app
+from backend.services.reddit.entities import RedditEntityService, TtlCache, normalize_entity_query
 from backend.tests.fixtures.reddit_submissions import (
     direct_image_submission,
     gallery_submission,
@@ -20,14 +32,14 @@ class FakeListing(list):
 
 
 class FakeSubreddit:
-    def __init__(self, name="pics", items=None, over_18=False):
+    def __init__(self, name="pics", items=None, over_18=False, subreddit_type="public"):
         self.display_name = name
         self.title = "Pictures"
         self.public_description = "Image community"
         self.icon_img = "https://example.com/icon.png"
         self.subscribers = 1234
         self.over18 = over_18
-        self.subreddit_type = "public"
+        self.subreddit_type = subreddit_type
         self.items = items or []
         self.calls = []
 
@@ -87,22 +99,26 @@ class FakeUser:
 
 
 class FakeRedditors:
-    def __init__(self, results):
+    def __init__(self, results, error=None):
         self.results = results
         self.calls = 0
+        self.error = error
 
     def search(self, query, limit=20):
+        if self.error:
+            raise self.error
         self.calls += 1
         return self.results[:limit]
 
 
 class FakeReddit:
-    def __init__(self, subreddit=None, users=None, subreddits=None, error=None):
+    def __init__(self, subreddit=None, users=None, subreddits=None, error=None, redditors_error=None):
         self._subreddit = subreddit or FakeSubreddit()
         self._users = users or {"example": FakeUser()}
         self.subreddits = FakeSubreddits(subreddits or [self._subreddit])
-        self.redditors = FakeRedditors(list(self._users.values()))
+        self.redditors = FakeRedditors(list(self._users.values()), error=redditors_error)
         self.error = error
+        self.redditors_error = redditors_error
 
     def subreddit(self, name):
         if self.error:
@@ -194,6 +210,34 @@ class RedditEntityServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.browse_media(entity_type="user", entity_name="example", sort="rising")
 
+    def test_user_hot_sort_rejected(self):
+        reddit = FakeReddit()
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(ValueError):
+            service.browse_media(entity_type="user", entity_name="example", sort="hot")
+
+    def test_user_new_and_top_use_submissions_listing(self):
+        user = FakeUser(items=[direct_image_submission()])
+        reddit = FakeReddit(users={"example": user})
+        service = RedditEntityService(FakeProvider(reddit))
+
+        service.browse_media(entity_type="user", entity_name="example", sort="new")
+        service.browse_media(entity_type="user", entity_name="example", sort="top", time_filter="week")
+
+        self.assertEqual(user.submissions.calls[0][0], "new")
+        self.assertEqual(user.submissions.calls[1][0], "top")
+        self.assertEqual(user.submissions.calls[1][1]["time_filter"], "week")
+
+    def test_subreddit_hot_and_rising_sorts_are_accepted(self):
+        subreddit = FakeSubreddit(items=[direct_image_submission()])
+        reddit = FakeReddit(subreddit=subreddit)
+        service = RedditEntityService(FakeProvider(reddit))
+
+        service.browse_media(entity_type="subreddit", entity_name="pics", sort="hot")
+        service.browse_media(entity_type="subreddit", entity_name="pics", sort="rising")
+
+        self.assertEqual([call[0] for call in subreddit.calls[-2:]], ["hot", "rising"])
+
     def test_unsupported_links_are_excluded(self):
         reddit = FakeReddit(subreddit=FakeSubreddit(items=[unsupported_submission()]))
         service = RedditEntityService(FakeProvider(reddit))
@@ -203,14 +247,124 @@ class RedditEntityServiceTests(unittest.TestCase):
     def test_suspended_user_handled_safely(self):
         reddit = FakeReddit(users={"gone": FakeUser("gone", suspended=True)})
         service = RedditEntityService(FakeProvider(reddit))
-        with self.assertRaises(RedditSearchError):
+        with self.assertRaises(RedditUserSuspendedError):
             service.browse_media(entity_type="user", entity_name="gone", sort="new")
 
     def test_missing_subreddit_handled_safely(self):
-        reddit = FakeReddit(error=RuntimeError("boom"))
+        reddit = FakeReddit(error=prawcore_exceptions.NotFound(Mock()))
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(RedditEntityNotFoundError):
+            service.browse_media(entity_type="subreddit", entity_name="pics")
+
+    def test_private_subreddit_handled_safely(self):
+        reddit = FakeReddit(subreddit=FakeSubreddit(subreddit_type="private"))
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(PrivateSubredditError):
+            service.browse_media(entity_type="subreddit", entity_name="pics")
+
+    def test_upstream_failure_remains_search_error(self):
+        reddit = FakeReddit(error=RuntimeError("reddit down"))
         service = RedditEntityService(FakeProvider(reddit))
         with self.assertRaises(RedditSearchError):
             service.browse_media(entity_type="subreddit", entity_name="pics")
+
+    def test_exact_missing_user_returns_no_result(self):
+        reddit = FakeReddit(users={})
+        reddit.redditor = Mock(side_effect=prawcore_exceptions.NotFound(Mock()))
+        service = RedditEntityService(FakeProvider(reddit))
+        self.assertIsNone(service._exact_user(reddit, "missing"))
+
+    def test_exact_user_timeout_propagates(self):
+        reddit = FakeReddit(users={})
+        reddit.redditor = Mock(side_effect=TimeoutError("slow"))
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(TimeoutError):
+            service._exact_user(reddit, "slow")
+
+    def test_exact_user_unexpected_exception_propagates(self):
+        reddit = FakeReddit(users={})
+        reddit.redditor = Mock(side_effect=AssertionError("bug"))
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(AssertionError):
+            service._exact_user(reddit, "bug")
+
+    def test_exact_match_is_appended_without_duplication(self):
+        reddit = FakeReddit(users={"example": FakeUser("example")})
+        reddit.redditors = FakeRedditors([])
+        service = RedditEntityService(FakeProvider(reddit))
+        users = service._search_users(reddit, "example", 20)
+        self.assertEqual([user.username for user in users], ["example"])
+        reddit.redditors = FakeRedditors([FakeUser("example")])
+        users = service._search_users(reddit, "example", 20)
+        self.assertEqual([user.username for user in users], ["example"])
+
+    def test_user_search_failure_is_not_silently_empty(self):
+        reddit = FakeReddit(redditors_error=RuntimeError("temporary"))
+        service = RedditEntityService(FakeProvider(reddit))
+        with self.assertRaises(RedditSearchError):
+            service.search_entities("example")
+
+
+class TtlCacheTests(unittest.TestCase):
+    def test_cache_returns_stored_value_and_evicts_lru(self):
+        cache = TtlCache(ttl_seconds=60, max_size=2)
+        cache.set(("a",), 1)
+        cache.set(("b",), 2)
+        self.assertEqual(cache.get(("a",)), 1)
+        cache.set(("c",), 3)
+        self.assertIsNone(cache.get(("b",)))
+        self.assertEqual(cache.get(("c",)), 3)
+
+    def test_expired_value_is_removed(self):
+        cache = TtlCache(ttl_seconds=0, max_size=2)
+        cache.set(("a",), 1)
+        self.assertIsNone(cache.get(("a",)))
+
+    def test_concurrent_access_is_safe(self):
+        cache = TtlCache(ttl_seconds=60, max_size=20)
+
+        def touch(index):
+            key = (index % 5,)
+            cache.set(key, index)
+            return cache.get(key)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(touch, range(100)))
+
+        self.assertEqual(len(results), 100)
+
+
+class RedditEntityRouteTests(unittest.TestCase):
+    def tearDown(self):
+        app.dependency_overrides.pop(get_reddit_entity_service, None)
+
+    def _client_with_service(self, service):
+        app.dependency_overrides[get_reddit_entity_service] = lambda: service
+        return TestClient(app)
+
+    def test_route_rejects_invalid_user_sort_with_400(self):
+        client = self._client_with_service(RedditEntityService(FakeProvider(FakeReddit())))
+        response = client.get("/api/reddit/media?entity_type=user&entity_name=test&sort=hot")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Invalid sort for this entity.")
+
+    def test_route_maps_typed_errors_without_message_inference(self):
+        service = Mock()
+        service.browse_media.side_effect = RedditEntityNotFoundError("suspended words should not matter")
+        client = self._client_with_service(service)
+        response = client.get("/api/reddit/media?entity_type=subreddit&entity_name=gone")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "This Reddit community or user does not exist or is unavailable.")
+
+        service.browse_media.side_effect = PrivateSubredditError("private")
+        response = client.get("/api/reddit/media?entity_type=subreddit&entity_name=private")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["detail"], "This subreddit is private.")
+
+        service.browse_media.side_effect = RedditSearchError("does not exist text from upstream")
+        response = client.get("/api/reddit/media?entity_type=subreddit&entity_name=boom")
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["detail"], "Reddit media browsing is temporarily unavailable.")
 
 
 if __name__ == "__main__":

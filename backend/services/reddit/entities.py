@@ -3,13 +3,19 @@ from __future__ import annotations
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
+from threading import Lock
 from time import monotonic
 from typing import Any
 
 from praw.exceptions import PRAWException
 from prawcore import exceptions as prawcore_exceptions
 
-from backend.api.errors import InvalidSubredditError, RedditSearchError
+from backend.api.errors import (
+    PrivateSubredditError,
+    RedditEntityNotFoundError,
+    RedditSearchError,
+    RedditUserSuspendedError,
+)
 from backend.models.reddit import (
     RedditEntityMediaResponse,
     RedditEntitySearchResponse,
@@ -27,7 +33,7 @@ from backend.utils.urls import clean_url
 logger = get_logger(__name__)
 ENTITY_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{2,32}$")
 SUBREDDIT_SORTS = {"hot", "new", "top", "rising"}
-USER_SORTS = {"new", "top", "hot"}
+USER_SORTS = {"new", "top"}
 MEDIA_TYPES = {"all", "image", "video", "gif", "gallery"}
 TIME_FILTERS = {"hour", "day", "week", "month", "year", "all"}
 
@@ -43,23 +49,30 @@ class TtlCache:
         self.ttl_seconds = ttl_seconds
         self.max_size = max_size
         self._values: OrderedDict[tuple[object, ...], CacheEntry] = OrderedDict()
+        self._lock = Lock()
 
     def get(self, key: tuple[object, ...]) -> object | None:
-        entry = self._values.get(key)
         now = monotonic()
-        if entry is None:
-            return None
-        if entry.expires_at <= now:
-            self._values.pop(key, None)
-            return None
-        self._values.move_to_end(key)
-        return entry.value
+        with self._lock:
+            entry = self._values.get(key)
+            if entry is None:
+                return None
+            if entry.expires_at <= now:
+                self._values.pop(key, None)
+                return None
+            self._values.move_to_end(key)
+            return entry.value
 
     def set(self, key: tuple[object, ...], value: object) -> None:
-        self._values[key] = CacheEntry(monotonic() + self.ttl_seconds, value)
-        self._values.move_to_end(key)
-        while len(self._values) > self.max_size:
-            self._values.popitem(last=False)
+        with self._lock:
+            self._values[key] = CacheEntry(monotonic() + self.ttl_seconds, value)
+            self._values.move_to_end(key)
+            while len(self._values) > self.max_size:
+                self._values.popitem(last=False)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._values.clear()
 
 
 class RedditEntityService:
@@ -165,14 +178,21 @@ class RedditEntityService:
                 time_filter=time_filter,
                 message=self.search_service._result_message(stats),
             )
+        except PrivateSubredditError:
+            raise
+        except RedditEntityNotFoundError:
+            raise
         except (
             prawcore_exceptions.Redirect,
             prawcore_exceptions.NotFound,
-            prawcore_exceptions.Forbidden,
         ) as exc:
             if clean_type == "subreddit":
-                raise InvalidSubredditError("This subreddit does not exist or is unavailable.") from exc
-            raise RedditSearchError("This Reddit user does not exist or is unavailable.") from exc
+                raise RedditEntityNotFoundError("This Reddit community or user does not exist or is unavailable.") from exc
+            raise RedditEntityNotFoundError("This Reddit community or user does not exist or is unavailable.") from exc
+        except prawcore_exceptions.Forbidden as exc:
+            if clean_type == "subreddit":
+                raise PrivateSubredditError("This subreddit is private.") from exc
+            raise RedditEntityNotFoundError("This Reddit community or user does not exist or is unavailable.") from exc
         except (PRAWException, prawcore_exceptions.PrawcoreException, ConnectionError, TimeoutError, RuntimeError) as exc:
             logger.warning(
                 "reddit.entities.media.failure entity_type=%s entity_name=%s error_type=%s error=%s",
@@ -202,8 +222,15 @@ class RedditEntityService:
         try:
             redditor = reddit.redditor(username)
             _ = get_value(redditor, "id")
-            return normalize_user_entity(redditor)
-        except Exception:
+            normalized = normalize_user_entity(redditor)
+            if normalized and normalized.suspended:
+                return None
+            return normalized
+        except (
+            prawcore_exceptions.NotFound,
+            prawcore_exceptions.Redirect,
+            prawcore_exceptions.Forbidden,
+        ):
             return None
 
     def _listing_for_entity(
@@ -233,8 +260,7 @@ class RedditEntityService:
         target = reddit.redditor(entity_name)
         entity = self._user_media_entity(target)
         submissions = target.submissions
-        listing_target = submissions if sort in {"new", "top"} else target
-        listing = _call_listing(listing_target, sort, time_filter, kwargs)
+        listing = _call_listing(submissions, sort, time_filter, kwargs)
         return entity, listing
 
     def _subreddit_media_entity(self, subreddit: Any) -> RedditMediaEntity:
@@ -244,7 +270,9 @@ class RedditEntityService:
             return cached  # type: ignore[return-value]
         normalized = normalize_subreddit_entity(subreddit)
         if normalized is None:
-            raise InvalidSubredditError("This subreddit does not exist or is unavailable.")
+            raise RedditEntityNotFoundError("This Reddit community or user does not exist or is unavailable.")
+        if normalized.private:
+            raise PrivateSubredditError("This subreddit is private.")
         entity = RedditMediaEntity(
             type="subreddit",
             name=normalized.name,
@@ -266,7 +294,7 @@ class RedditEntityService:
             return cached  # type: ignore[return-value]
         normalized = normalize_user_entity(user)
         if normalized is None or normalized.suspended:
-            raise RedditSearchError("This Reddit user is suspended or unavailable.")
+            raise RedditUserSuspendedError("This Reddit user is suspended or unavailable.")
         entity = RedditMediaEntity(
             type="user",
             name=normalized.username,

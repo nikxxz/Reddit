@@ -5,7 +5,13 @@ from backend.api.dependencies import (
     get_reddit_entity_service,
     get_reddit_search_service,
 )
-from backend.api.errors import InvalidSubredditError, RedditSearchError
+from backend.api.errors import (
+    InvalidSubredditError,
+    PrivateSubredditError,
+    RedditEntityNotFoundError,
+    RedditSearchError,
+    RedditUserSuspendedError,
+)
 from backend.config import settings
 from backend.models.reddit import RedditEntityMediaResponse, RedditEntitySearchResponse, RedditSearchResponse
 from backend.services.reddit import (
@@ -150,12 +156,17 @@ def browse_reddit_entity_media(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    except InvalidSubredditError:
-        raise HTTPException(status_code=404, detail="This subreddit does not exist or is unavailable.") from None
-    except RedditSearchError as exc:
-        detail = str(exc) or "Reddit media browsing is temporarily unavailable."
-        status_code = 404 if "does not exist" in detail or "suspended" in detail else 502
-        raise HTTPException(status_code=status_code, detail=detail) from None
+    except PrivateSubredditError:
+        raise HTTPException(status_code=403, detail="This subreddit is private.") from None
+    except RedditUserSuspendedError:
+        raise HTTPException(status_code=404, detail="This Reddit user is suspended or unavailable.") from None
+    except RedditEntityNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="This Reddit community or user does not exist or is unavailable.",
+        ) from None
+    except RedditSearchError:
+        raise HTTPException(status_code=502, detail="Reddit media browsing is temporarily unavailable.") from None
 
 
 @router.get("/reddit/search/debug")

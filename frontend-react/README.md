@@ -13,9 +13,9 @@ The sidebar contains four primary entries:
 - Downloads
 - Settings
 
-`Subreddits / Users` opens `/browse`, where a combined search field finds Reddit communities and users. Selecting a result opens `/browse/subreddit/:name` or `/browse/user/:username`. The entity media browser persists filters in the URL query string, reuses the shared media grid, preview modal, gallery carousel, and download controls, and only renders normalized media posts returned by the backend.
+`Subreddits / Users` opens `/browse`, where a combined search field finds Reddit communities and users. Selecting a result opens `/browse/subreddit/:name` or `/browse/user/:username`. The entity media browser persists normalized filters in the URL query string, reuses the shared media grid, preview modal, gallery carousel, and download controls, and only renders normalized media posts returned by the backend.
 
-User search support is limited by Reddit/PRAW capabilities. When broad user search is unavailable, the backend falls back to exact username lookup.
+Subreddit feeds support Hot, New, Top, and Rising. User feeds support New and Top. Time ranges apply only to Top. Invalid URL filter values are normalized to safe defaults, and private or unavailable entities render safe app messages. User search support is limited by Reddit/PRAW capabilities. When broad user search is unavailable, the backend falls back to exact username lookup.
 
 ## Development
 

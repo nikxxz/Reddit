@@ -16,6 +16,7 @@ const DEFAULT_SORT_OPTIONS = [
 ];
 
 const TIME_OPTIONS = [
+  { value: "hour", label: "Past hour" },
   { value: "all", label: "All time" },
   { value: "day", label: "Today" },
   { value: "week", label: "This week" },

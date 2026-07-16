@@ -212,11 +212,13 @@ Selecting a result opens a bookmarkable media-only route:
 
 ```text
 /browse
-/browse/subreddit/pics?sort=top&time=week&media=images&nsfw=false
+/browse/subreddit/pics?sort=top&time=week&media=image&nsfw=false
 /browse/user/example?sort=new&media=all&nsfw=false
 ```
 
-Entity browsing reuses the same normalized media item model, cards, preview modal, gallery carousel, and download controls as the main Search page. Text-only posts, polls, unsupported links, and comment discussions are excluded by the backend normalizer. Subreddit feeds support Hot, New, Top, and Rising. User feeds support New, Top, and Hot; broad user search depends on Reddit/PRAW support and falls back to exact username lookup when needed.
+Entity browsing reuses the same normalized media item model, cards, preview modal, gallery carousel, and download controls as the main Search page. Text-only posts, polls, unsupported links, and comment discussions are excluded by the backend normalizer. Subreddit feeds support Hot, New, Top, and Rising. User feeds support New and Top. Time ranges apply to Top feeds; other sorts normalize the URL time range to `all`. Invalid query values normalize to safe defaults, including legacy user `sort=hot` URLs becoming `sort=new`.
+
+Private communities, missing communities, suspended users, and temporary Reddit failures are reported with safe app messages rather than raw Reddit/PRAW errors. Broad user search depends on Reddit/PRAW support and falls back to exact username lookup when needed; if Reddit user search itself is temporarily unavailable, the combined search fails safely instead of pretending there were no user matches.
 
 The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, writability, schema version, expected schema version, migration-required state, safe database error code, backup availability, lifecycle readiness, reconciliation state, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
 
