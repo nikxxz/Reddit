@@ -1,6 +1,6 @@
 # Reddit Media Downloader
 
-A local FastAPI and React application for browsing Reddit media and saving selected files to the host computer. The app supports anonymous Reddit browsing where Reddit allows it, OAuth-authenticated access, keyword search, subreddit-only browsing, media filters, NSFW filtering, responsive media cards, gallery previews, background download jobs, progress polling, and cancellation.
+A local FastAPI and React application for browsing Reddit media and saving selected files to the host computer. The app supports anonymous Reddit browsing where Reddit allows it, OAuth-authenticated access, keyword search, subreddit-only browsing, subreddit/user media browsing, media filters, NSFW filtering, responsive media cards, gallery previews, background download jobs, progress polling, and cancellation.
 
 The authoritative frontend is `frontend-react/`, built with React, Vite, and Mantine. FastAPI serves the production React build from `frontend-react/dist`. The older browser-module frontend is archived under `legacy/frontend/` and is no longer served.
 
@@ -8,7 +8,9 @@ The authoritative frontend is `frontend-react/`, built with React, Vite, and Man
 
 - Reddit OAuth sign-in, session restore, and disconnect
 - Anonymous and authenticated Reddit access
+- Four primary navigation areas: Search, Subreddits / Users, Downloads, and Settings
 - Keyword search and subreddit-only browsing
+- Combined subreddit/user search with media-only entity browsing
 - Media-type filters for images, GIFs, videos, external media, and galleries
 - NSFW filtering
 - Responsive media grid with preview modal and gallery carousel
@@ -201,6 +203,20 @@ GET /api/ready
 POST /api/library/reconcile
 GET /api/library/reconcile/status
 ```
+
+## Subreddits / Users Browser
+
+The Subreddits / Users page lets one search field find matching Reddit communities and users. Prefixes such as `r/pics`, `/r/pics`, `u/example`, and `/u/example` are normalized before search.
+
+Selecting a result opens a bookmarkable media-only route:
+
+```text
+/browse
+/browse/subreddit/pics?sort=top&time=week&media=images&nsfw=false
+/browse/user/example?sort=new&media=all&nsfw=false
+```
+
+Entity browsing reuses the same normalized media item model, cards, preview modal, gallery carousel, and download controls as the main Search page. Text-only posts, polls, unsupported links, and comment discussions are excluded by the backend normalizer. Subreddit feeds support Hot, New, Top, and Rising. User feeds support New, Top, and Hot; broad user search depends on Reddit/PRAW support and falls back to exact username lookup when needed.
 
 The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, writability, schema version, expected schema version, migration-required state, safe database error code, backup availability, lifecycle readiness, reconciliation state, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
 

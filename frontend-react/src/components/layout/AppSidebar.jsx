@@ -9,8 +9,8 @@ import {
   Title
 } from "@mantine/core";
 import {
+  IconCompass,
   IconDownload,
-  IconHistory,
   IconSearch,
   IconSettings
 } from "@tabler/icons-react";
@@ -19,8 +19,8 @@ import { ConnectionSummary } from "./ConnectionSummary";
 
 const NAV_ITEMS = [
   { value: "search", label: "Search", icon: IconSearch },
+  { value: "browse", label: "Subreddits / Users", icon: IconCompass },
   { value: "downloads", label: "Downloads", icon: IconDownload },
-  { value: "history", label: "History", icon: IconHistory },
   { value: "settings", label: "Settings", icon: IconSettings }
 ];
 

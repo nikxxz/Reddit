@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.api.dependencies import (
     get_reddit_connection_service,
+    get_reddit_entity_service,
     get_reddit_search_service,
 )
 from backend.api.errors import InvalidSubredditError, RedditSearchError
 from backend.config import settings
-from backend.models.reddit import RedditSearchResponse
+from backend.models.reddit import RedditEntityMediaResponse, RedditEntitySearchResponse, RedditSearchResponse
 from backend.services.reddit import (
     ALLOWED_MEDIA_TYPES,
     ALLOWED_SORTS,
@@ -15,6 +16,7 @@ from backend.services.reddit import (
     RedditSearchService,
     normalize_subreddit_input,
 )
+from backend.services.reddit.entities import RedditEntityService
 from backend.utils.logging import get_logger
 
 router = APIRouter(tags=["reddit"])
@@ -103,6 +105,57 @@ def search_reddit_media(
             clean_subreddit or "all",
         )
         raise HTTPException(status_code=502, detail="Reddit search is temporarily unavailable.") from None
+
+
+@router.get("/reddit/entities/search", response_model=RedditEntitySearchResponse)
+def search_reddit_entities(
+    q: str = Query(default=""),
+    limit: int = Query(default=20),
+    service: RedditEntityService = Depends(get_reddit_entity_service),
+) -> RedditEntitySearchResponse:
+    if limit < 1 or limit > 20:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 20.")
+    try:
+        return service.search_entities(q, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except RedditSearchError:
+        raise HTTPException(status_code=502, detail="Reddit entity search is temporarily unavailable.") from None
+
+
+@router.get("/reddit/media", response_model=RedditEntityMediaResponse)
+def browse_reddit_entity_media(
+    entity_type: str = Query(),
+    entity_name: str = Query(),
+    sort: str = Query(default="hot"),
+    time_filter: str = Query(default="all"),
+    media_type: str = Query(default="all"),
+    include_nsfw: bool = Query(default=False),
+    cursor: str | None = Query(default=None),
+    limit: int = Query(default=24),
+    service: RedditEntityService = Depends(get_reddit_entity_service),
+) -> RedditEntityMediaResponse:
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 50.")
+    try:
+        return service.browse_media(
+            entity_type=entity_type,
+            entity_name=entity_name,
+            sort=sort,
+            time_filter=time_filter,
+            media_type=media_type,
+            include_nsfw=include_nsfw,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except InvalidSubredditError:
+        raise HTTPException(status_code=404, detail="This subreddit does not exist or is unavailable.") from None
+    except RedditSearchError as exc:
+        detail = str(exc) or "Reddit media browsing is temporarily unavailable."
+        status_code = 404 if "does not exist" in detail or "suspended" in detail else 502
+        raise HTTPException(status_code=status_code, detail=detail) from None
 
 
 @router.get("/reddit/search/debug")

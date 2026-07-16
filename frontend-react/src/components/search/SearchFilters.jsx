@@ -8,7 +8,7 @@ const MEDIA_TYPES = [
   { value: "gallery", label: "Gallery" }
 ];
 
-const SORT_OPTIONS = [
+const DEFAULT_SORT_OPTIONS = [
   { value: "relevance", label: "Relevance" },
   { value: "new", label: "New" },
   { value: "top", label: "Top" },
@@ -23,7 +23,12 @@ const TIME_OPTIONS = [
   { value: "year", label: "This year" }
 ];
 
-export function SearchFilters({ values, onFieldChange }) {
+export function SearchFilters({
+  values,
+  onFieldChange,
+  sortOptions = DEFAULT_SORT_OPTIONS,
+  disableTime = false
+}) {
   return (
     <Stack gap="md">
       <Stack gap="xs">
@@ -48,7 +53,7 @@ export function SearchFilters({ values, onFieldChange }) {
         <Select
           className="filter-select"
           label="Sort"
-          data={SORT_OPTIONS}
+          data={sortOptions}
           value={values.sortBy}
           allowDeselect={false}
           onChange={(value) => onFieldChange("sortBy", value)}
@@ -58,6 +63,7 @@ export function SearchFilters({ values, onFieldChange }) {
           label="Time"
           data={TIME_OPTIONS}
           value={values.timeFilter}
+          disabled={disableTime}
           allowDeselect={false}
           onChange={(value) => onFieldChange("timeFilter", value)}
         />

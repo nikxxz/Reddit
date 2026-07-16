@@ -4,6 +4,19 @@
 
 FastAPI serves the production build from `frontend-react/dist/` at `http://127.0.0.1:8000`. The archived browser-module frontend lives under `legacy/frontend/` and is no longer served.
 
+## App Navigation
+
+The sidebar contains four primary entries:
+
+- Search
+- Subreddits / Users
+- Downloads
+- Settings
+
+`Subreddits / Users` opens `/browse`, where a combined search field finds Reddit communities and users. Selecting a result opens `/browse/subreddit/:name` or `/browse/user/:username`. The entity media browser persists filters in the URL query string, reuses the shared media grid, preview modal, gallery carousel, and download controls, and only renders normalized media posts returned by the backend.
+
+User search support is limited by Reddit/PRAW capabilities. When broad user search is unavailable, the backend falls back to exact username lookup.
+
 ## Development
 
 Install dependencies:
@@ -41,7 +54,7 @@ Use `npm.cmd` on Windows if PowerShell blocks `npm.ps1` with an execution-policy
 ## Structure
 
 - `src/api/`: FastAPI API clients
-- `src/components/`: UI components
+- `src/components/`: UI components, including entity search cards and shared media cards
 - `src/hooks/`: stateful React hooks
 - `src/pages/`: top-level app views
 - `src/styles/`: app CSS

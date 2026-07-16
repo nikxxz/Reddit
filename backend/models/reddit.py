@@ -55,3 +55,59 @@ class RedditSearchResponse(BaseModel):
     next_after: str | None = None
     message: str | None = None
     items: list[RedditMediaItem]
+
+
+class RedditSubredditEntity(BaseModel):
+    name: str
+    display_name: str | None = None
+    title: str | None = None
+    description: str | None = None
+    icon_url: str | None = None
+    subscribers: int | None = None
+    over_18: bool = False
+    restricted: bool = False
+    private: bool = False
+
+
+class RedditUserEntity(BaseModel):
+    username: str
+    display_name: str | None = None
+    avatar_url: str | None = None
+    link_karma: int | None = None
+    comment_karma: int | None = None
+    over_18: bool = False
+    suspended: bool = False
+
+
+class RedditEntitySearchResponse(BaseModel):
+    query: str
+    subreddits: list[RedditSubredditEntity] = []
+    users: list[RedditUserEntity] = []
+
+
+class RedditMediaEntity(BaseModel):
+    type: str
+    name: str
+    title: str | None = None
+    description: str | None = None
+    icon_url: str | None = None
+    subscribers: int | None = None
+    over_18: bool = False
+    restricted: bool = False
+    private: bool = False
+    avatar_url: str | None = None
+    link_karma: int | None = None
+    comment_karma: int | None = None
+    suspended: bool = False
+
+
+class RedditEntityMediaResponse(BaseModel):
+    entity: RedditMediaEntity
+    items: list[RedditMediaItem]
+    count: int
+    next_cursor: str | None = None
+    has_more: bool = False
+    media_type: str
+    sort: str
+    time_filter: str
+    message: str | None = None
