@@ -14,6 +14,17 @@
   min-width: 190px;
 }
 
+.universal-provider-options {
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+
+.universal-provider-options .mantine-TextInput-root,
+.universal-provider-options .mantine-Select-root {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .universal-provider-status {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -51,6 +62,8 @@
 
   .universal-query-input,
   .universal-sort-select,
+  .universal-provider-options .mantine-TextInput-root,
+  .universal-provider-options .mantine-Select-root,
   .universal-search-row .search-submit-button {
     flex: 1 1 auto;
     width: 100%;
@@ -70,4 +83,3 @@
     align-items: stretch;
   }
 }
-

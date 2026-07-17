@@ -22,6 +22,7 @@ DownloadStatus = Literal[
 
 class DownloadRequest(BaseModel):
     post_id: str = Field(min_length=1, max_length=80)
+    provider: str = "reddit"
     media_type: str = "unknown"
     download_strategy: str | None = None
     media_url: str | None = None
@@ -99,6 +100,7 @@ class DownloadJobSummary(BaseModel):
     id: str | None = None
     job_id: str
     post_id: str
+    provider: str = "reddit"
     status: DownloadStatus
     availability: str = "unknown"
     progress: int | None = None

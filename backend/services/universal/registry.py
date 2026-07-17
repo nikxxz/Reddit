@@ -6,7 +6,7 @@ from backend.services.universal.errors import DuplicateProviderError, UnknownPro
 from backend.services.universal.providers.instagram_placeholder import InstagramPlaceholderProvider
 from backend.services.universal.providers.pinterest_placeholder import PinterestPlaceholderProvider
 from backend.services.universal.providers.reddit_adapter import RedditUniversalProvider
-from backend.services.universal.providers.tumblr_placeholder import TumblrPlaceholderProvider
+from backend.services.universal.providers.tumblr import TumblrUniversalProvider
 
 
 class UniversalProviderRegistry:
@@ -39,6 +39,7 @@ class UniversalProviderRegistry:
                     health=health.state,
                     authenticated=health.authenticated,
                     capabilities=provider.capabilities(),
+                    rate_limit=health.rate_limit,
                 )
             )
         return summaries
@@ -47,11 +48,10 @@ class UniversalProviderRegistry:
 def create_default_registry() -> UniversalProviderRegistry:
     registry = UniversalProviderRegistry()
     registry.register(RedditUniversalProvider())
-    registry.register(TumblrPlaceholderProvider())
+    registry.register(TumblrUniversalProvider())
     registry.register(PinterestPlaceholderProvider())
     registry.register(InstagramPlaceholderProvider())
     return registry
 
 
 universal_provider_registry = create_default_registry()
-

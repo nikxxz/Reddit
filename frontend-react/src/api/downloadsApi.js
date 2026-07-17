@@ -1,7 +1,8 @@
 import { apiRequest } from "./apiClient";
 
 export function startDownload(payload, { signal } = {}) {
-  return apiRequest("/api/downloads", {
+  const path = payload?.provider && payload.provider !== "reddit" ? "/api/universal/downloads" : "/api/downloads";
+  return apiRequest(path, {
     method: "POST",
     body: payload,
     signal

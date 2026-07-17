@@ -35,6 +35,7 @@ def create_download(job_id: str, request: DownloadRequest, retry_of_id: str | No
         lambda: downloads_repo.create_download_record(
             job_id=job_id,
             post_id=request.post_id,
+            provider=request.provider,
             title=request.title,
             subreddit=request.subreddit,
             author=request.author,

@@ -11,6 +11,7 @@ def duplicate_for_request(request: DownloadRequest):
             request.media_type,
             request.download_scope,
             request.gallery_index if request.download_scope == "gallery_current" else None,
+            provider=request.provider,
         )
     except Exception:
         return None

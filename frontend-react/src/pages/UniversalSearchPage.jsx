@@ -46,6 +46,9 @@ export function UniversalSearchPage() {
   const [mediaTypes, setMediaTypes] = useState(["image", "gif", "video", "gallery"]);
   const [includeNsfw, setIncludeNsfw] = useState(false);
   const [sort, setSort] = useState("source_balanced");
+  const [tumblrMode, setTumblrMode] = useState("tag");
+  const [tumblrBlog, setTumblrBlog] = useState("");
+  const [tumblrTag, setTumblrTag] = useState("");
   const [validationError, setValidationError] = useState("");
 
   const providerMap = useMemo(
@@ -68,6 +71,10 @@ export function UniversalSearchPage() {
       setValidationError("Select at least one media type.");
       return;
     }
+    if (providers.includes("tumblr") && tumblrMode !== "tag" && !normalizeTumblrBlog(tumblrBlog)) {
+      setValidationError("Enter a valid Tumblr blog name or URL.");
+      return;
+    }
     setValidationError("");
     submitSearch({
       query: cleanQuery,
@@ -75,7 +82,14 @@ export function UniversalSearchPage() {
       media_types: mediaTypes,
       sort,
       include_nsfw: includeNsfw,
-      limit_per_provider: 24
+      limit_per_provider: 24,
+      provider_filters: {
+        tumblr: {
+          mode: tumblrMode === "blog" && (tumblrTag.trim() || cleanQuery) ? "blog_tag" : tumblrMode,
+          blog: tumblrMode === "tag" ? null : tumblrBlog.trim(),
+          tag: tumblrTag.trim() || null
+        }
+      }
     });
   };
 
@@ -175,6 +189,44 @@ export function UniversalSearchPage() {
                     onChange={(event) => setIncludeNsfw(event.currentTarget.checked)}
                   />
                 </Group>
+
+                {providers.includes("tumblr") ? (
+                  <Paper className="universal-provider-options" withBorder p="sm" radius="sm">
+                    <Stack gap="sm">
+                      <Group justify="space-between" gap="sm">
+                        <Text fw={700} size="sm">Tumblr options</Text>
+                        <Badge variant="light">Tag-oriented</Badge>
+                      </Group>
+                      <Group className="universal-filter-row" gap="md" align="flex-end">
+                        <Select
+                          label="Tumblr search mode"
+                          data={[
+                            { value: "tag", label: "Tags" },
+                            { value: "blog", label: "Blog" }
+                          ]}
+                          value={tumblrMode}
+                          onChange={(value) => setTumblrMode(value || "tag")}
+                          allowDeselect={false}
+                        />
+                        {tumblrMode === "blog" ? (
+                          <TextInput
+                            label="Blog name or URL"
+                            value={tumblrBlog}
+                            onChange={(event) => setTumblrBlog(event.currentTarget.value)}
+                            error={tumblrBlog && !normalizeTumblrBlog(tumblrBlog) ? "Use a Tumblr blog name or URL." : undefined}
+                            placeholder="staff or staff.tumblr.com"
+                          />
+                        ) : null}
+                        <TextInput
+                          label={tumblrMode === "blog" ? "Optional tag" : "Tag override"}
+                          value={tumblrTag}
+                          onChange={(event) => setTumblrTag(event.currentTarget.value)}
+                          placeholder={query || "digital art"}
+                        />
+                      </Group>
+                    </Stack>
+                  </Paper>
+                ) : null}
               </Stack>
             </form>
           </Stack>
@@ -243,6 +295,32 @@ export function UniversalSearchPage() {
   );
 }
 
+function normalizeTumblrBlog(value) {
+  const raw = value.trim();
+  if (!raw || hasControlCharacter(raw)) {
+    return null;
+  }
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const url = new URL(raw);
+      if (url.hostname === "www.tumblr.com" || url.hostname === "tumblr.com") {
+        return url.pathname.split("/").filter(Boolean)[0] || null;
+      }
+      if (url.hostname.endsWith(".tumblr.com")) {
+        return url.hostname;
+      }
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9-]{0,62}(\.tumblr\.com)?$/.test(raw) ? raw : null;
+}
+
+function hasControlCharacter(value) {
+  return [...value].some((char) => char.charCodeAt(0) < 32);
+}
+
 function ProviderStatusBar({ providerMap, providerStates }) {
   return (
     <div className="universal-provider-status" aria-label="Provider status">
@@ -259,7 +337,11 @@ function ProviderStatusBar({ providerMap, providerStates }) {
               </Badge>
             </Group>
             <Text size="xs" c="gray.6">
-              {provider?.implementation_status === "planned" ? "Planned provider" : "Available provider"}
+              {provider?.implementation_status === "planned"
+                ? "Planned provider"
+                : provider?.implementation_status === "configuration_required"
+                  ? "Configuration required"
+                  : "Available provider"}
             </Text>
           </Paper>
         );
@@ -314,7 +396,7 @@ function statusColor(status) {
 
 function summaryText(state) {
   if (state.status === "idle") {
-    return "Reddit is available now; Tumblr, Pinterest, and Instagram are planned.";
+    return "Reddit is available now; Tumblr is available when configured. Pinterest and Instagram are planned.";
   }
   if (state.status === "searching") {
     return "Searching selected sources.";

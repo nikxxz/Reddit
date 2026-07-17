@@ -2,6 +2,8 @@ import { Badge, Button, Group, Modal, Stack, Text, Title } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { IconExternalLink } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
+import { DownloadActions } from "../downloads/DownloadActions";
+import { useDownloadJob } from "../../hooks/useDownloadJob";
 import { GalleryPreviewCarousel } from "../media/GalleryPreviewCarousel";
 import {
   getMediaTypeLabel,
@@ -28,7 +30,7 @@ function toPreviewItem(item) {
   };
 }
 
-function PreviewContent({ item }) {
+function PreviewContent({ item, activeGalleryIndex, onGallerySlideChange }) {
   const previewItem = useMemo(() => toPreviewItem(item), [item]);
   const [videoFailed, setVideoFailed] = useState(false);
   const url = getSafeHttpUrl(item.preview_url);
@@ -38,7 +40,7 @@ function PreviewContent({ item }) {
   }, [item.provider_item_id, url]);
 
   if (item.media_type === "gallery") {
-    return <GalleryPreviewCarousel item={previewItem} />;
+    return <GalleryPreviewCarousel item={previewItem} activeSlide={activeGalleryIndex} onSlideChange={onGallerySlideChange} />;
   }
 
   if ((item.media_type === "video" || item.media_type === "gif") && url && isVideoUrl(url) && !videoFailed) {
@@ -104,9 +106,32 @@ export function UniversalPreviewModal({ opened, item, onClose }) {
       closeButtonProps={{ "aria-label": "Close universal media preview" }}
     >
       {item ? (
-        <Stack gap="md">
+        <UniversalPreviewBody
+          item={item}
+          previewItem={previewItem}
+          metadata={metadata}
+          sourceUrl={sourceUrl}
+        />
+      ) : null}
+    </Modal>
+  );
+}
+
+function UniversalPreviewBody({ item, previewItem, metadata, sourceUrl }) {
+  const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveGalleryIndex(0);
+  }, [item?.provider_item_id]);
+
+  return (
+    <Stack gap="md">
           <div className="media-preview-stage">
-            <PreviewContent item={item} />
+            <PreviewContent
+              item={item}
+              activeGalleryIndex={activeGalleryIndex}
+              onGallerySlideChange={setActiveGalleryIndex}
+            />
           </div>
 
           <Stack className="media-preview-details" gap="xs">
@@ -146,13 +171,54 @@ export function UniversalPreviewModal({ opened, item, onClose }) {
                   Open source
                 </Button>
               ) : null}
-              <Text size="sm" c="gray.6">
-                Universal downloads will be added in a later phase.
-              </Text>
+              {item.capabilities?.download_single ? (
+                <UniversalDownloadControls item={item} previewItem={previewItem} activeGalleryIndex={activeGalleryIndex} />
+              ) : (
+                <Text size="sm" c="gray.6">
+                  Universal downloads will be added in a later phase.
+                </Text>
+              )}
             </div>
           </Stack>
-        </Stack>
-      ) : null}
-    </Modal>
+    </Stack>
+  );
+}
+
+function UniversalDownloadControls({ item, previewItem, activeGalleryIndex }) {
+  const downloadJob = useDownloadJob();
+  const { reset } = downloadJob;
+
+  useEffect(() => {
+    reset();
+  }, [item?.provider_item_id, reset]);
+
+  const createDownloadPayload = (scope) => ({
+    provider: item.provider,
+    post_id: item.provider_item_id,
+    media_type: item.media_type,
+    download_strategy: "direct",
+    media_url: item.media_urls?.[activeGalleryIndex] || item.preview_url,
+    post_url: item.canonical_url,
+    subreddit: item.provider === "tumblr" ? item.collection || "tumblr" : item.collection,
+    author: item.author,
+    title: item.title,
+    thumbnail_url: item.thumbnail_url,
+    gallery_urls: item.media_urls || [],
+    gallery_index: item.media_type === "gallery" ? activeGalleryIndex : null,
+    download_scope: scope
+  });
+
+  return (
+    <DownloadActions
+      item={{
+        ...previewItem,
+        media_type: item.media_type,
+        gallery_count: item.media_count,
+        media_urls: item.media_urls || []
+      }}
+      downloadJob={downloadJob}
+      createPayload={createDownloadPayload}
+      className="media-preview-download-actions"
+    />
   );
 }

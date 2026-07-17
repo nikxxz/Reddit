@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 load_dotenv()
 
@@ -84,6 +84,17 @@ class Settings(BaseModel):
     universal_search_default_limit: int = Field(default=24, ge=1, le=100)
     universal_search_max_limit: int = Field(default=100, ge=1, le=100)
     max_concurrent_downloads: int = Field(default=2, ge=1)
+    tumblr_consumer_key: str | None = None
+    tumblr_consumer_secret: str | None = None
+    tumblr_oauth_token: str | None = None
+    tumblr_oauth_token_secret: str | None = None
+    tumblr_api_base_url: str = "https://api.tumblr.com/v2"
+    tumblr_request_timeout_seconds: float = Field(default=20, gt=0)
+    tumblr_max_retries: int = Field(default=2, ge=0)
+    tumblr_default_limit: int = Field(default=20, ge=1, le=50)
+    tumblr_max_limit: int = Field(default=50, ge=1, le=50)
+    tumblr_cache_ttl_seconds: int = Field(default=120, ge=0)
+    tumblr_max_pages_per_search: int = Field(default=3, ge=1, le=10)
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None
     reddit_user_agent: str | None = None
@@ -96,6 +107,12 @@ class Settings(BaseModel):
         if normalized == "jpg":
             return "jpeg"
         return normalized
+
+    @model_validator(mode="after")
+    def validate_tumblr_limits(self) -> "Settings":
+        if self.tumblr_default_limit > self.tumblr_max_limit:
+            raise ValueError("TUMBLR_DEFAULT_LIMIT must be less than or equal to TUMBLR_MAX_LIMIT")
+        return self
 
     @field_validator(
         "library_reconcile_on_startup",
@@ -184,6 +201,17 @@ ENV_FIELDS = {
     "UNIVERSAL_SEARCH_DEFAULT_LIMIT": ("universal_search_default_limit", int),
     "UNIVERSAL_SEARCH_MAX_LIMIT": ("universal_search_max_limit", int),
     "MAX_CONCURRENT_DOWNLOADS": ("max_concurrent_downloads", int),
+    "TUMBLR_CONSUMER_KEY": ("tumblr_consumer_key", str),
+    "TUMBLR_CONSUMER_SECRET": ("tumblr_consumer_secret", str),
+    "TUMBLR_OAUTH_TOKEN": ("tumblr_oauth_token", str),
+    "TUMBLR_OAUTH_TOKEN_SECRET": ("tumblr_oauth_token_secret", str),
+    "TUMBLR_API_BASE_URL": ("tumblr_api_base_url", str),
+    "TUMBLR_REQUEST_TIMEOUT_SECONDS": ("tumblr_request_timeout_seconds", float),
+    "TUMBLR_MAX_RETRIES": ("tumblr_max_retries", int),
+    "TUMBLR_DEFAULT_LIMIT": ("tumblr_default_limit", int),
+    "TUMBLR_MAX_LIMIT": ("tumblr_max_limit", int),
+    "TUMBLR_CACHE_TTL_SECONDS": ("tumblr_cache_ttl_seconds", int),
+    "TUMBLR_MAX_PAGES_PER_SEARCH": ("tumblr_max_pages_per_search", int),
     "REDDIT_CLIENT_ID": ("reddit_client_id", str),
     "REDDIT_CLIENT_SECRET": ("reddit_client_secret", str),
     "REDDIT_USER_AGENT": ("reddit_user_agent", str),

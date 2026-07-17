@@ -30,6 +30,9 @@ ALLOWED_DIRECT_HOSTS = {
     "www.redgifs.com",
     "streamable.com",
     "www.streamable.com",
+    "media.tumblr.com",
+    "tumblr.com",
+    "www.tumblr.com",
 }
 ALLOWED_CONTENT_PREFIXES = ("image/", "video/")
 ALLOWED_CONTENT_TYPES = {"application/octet-stream"}

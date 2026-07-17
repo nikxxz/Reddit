@@ -12,7 +12,7 @@ The authoritative frontend is `frontend-react/`, built with React, Vite, and Man
 - Media-type filters for images, GIFs, videos, external media, and galleries
 - NSFW filtering
 - Responsive media grid with preview modal and gallery carousel
-- Experimental Universal Search page with provider-neutral Reddit results
+- Universal Search page with provider-neutral Reddit and Tumblr results
 - Downloads for images, GIFs, videos, supported external media, and galleries
 - Background download jobs with progress, result files, failures, and cancellation
 - SQLite-backed persistent download history with portable relative file paths
@@ -212,9 +212,23 @@ Startup uses FastAPI lifespan. Critical path and database checks complete before
 
 ## Universal Search
 
-Universal Search is an experimental page for provider-neutral media search. Phase 1 supports Reddit results through an adapter around the existing Reddit search service. Tumblr, Pinterest, and Instagram are visible as planned providers and report `not_implemented`; they do not perform live searches yet.
+Universal Search is a provider-neutral media search page. It supports Reddit through the existing Reddit adapter and Tumblr through the official Tumblr API. Pinterest and Instagram remain planned placeholders.
 
-The existing Search page remains the stable full-featured Reddit search surface, including subreddit browsing, Reddit-specific filters, previews, downloads, history behavior, and OAuth flow. Universal Search has a separate preview flow and does not include Universal downloads or Universal history in this phase.
+Tumblr search is tag-oriented: a normal Universal query such as `digital art` is sent as one Tumblr tag unless the Tumblr tag override is filled in. Tumblr also supports public-blog browsing by blog name or URL, with optional tag filtering where the API supports it.
+
+Tumblr requires a consumer key for public reads:
+
+```text
+TUMBLR_CONSUMER_KEY=your_consumer_key
+```
+
+Optional OAuth fields are present in `.env.example` for future OAuth-only content, but public tag/blog reads do not require them. The API key and OAuth values are never returned to React.
+
+Supported Tumblr media includes NPF and legacy images, GIFs, videos with direct Tumblr media URLs, photosets/galleries, and mixed-media posts. External Tumblr video posts may preview with a poster but disable direct download when no trusted direct media URL is available. Tumblr downloads use the existing download manager, status lifecycle, duplicate checks, retry lineage, cancellation, local thumbnails, and provider-aware history.
+
+If Tumblr rate-limits requests, the provider reports `rate_limited` safely and Reddit results remain available. Retry timing is exposed only when Tumblr returns a trustworthy value.
+
+The existing Search page remains the stable full-featured Reddit search surface, including subreddit browsing, Reddit-specific filters, previews, downloads, history behavior, and OAuth flow.
 
 ## Development Workflow
 
@@ -262,7 +276,9 @@ This is a local personal tool. Treat it as host-machine access to downloads and 
 ## Current Limitations
 
 - Automatic orphan-file import is not implemented.
-- Universal Search currently searches Reddit only; Tumblr, Pinterest, Instagram, Universal downloads, and Universal history are planned.
+- Pinterest and Instagram Universal Search providers are still planned.
+- Some Tumblr external-video posts cannot be directly downloaded unless Tumblr exposes a trusted direct media URL.
+- OAuth-only Tumblr content is not covered by the current public-read provider.
 - Gallery "download missing items" is detected as partial history but queued as a full retry in this milestone.
 - The legacy frontend is archived under `legacy/frontend/` and is not served by FastAPI.
 - OAuth redirect behavior across LAN devices depends on matching Reddit app callback configuration.

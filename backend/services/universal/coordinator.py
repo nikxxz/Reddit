@@ -41,6 +41,7 @@ class UniversalSearchCoordinator:
                     include_nsfw=request.include_nsfw,
                     limit=request.limit_per_provider,
                     sort=request.sort,
+                    provider_filters=request.provider_filters,
                 )
                 try:
                     return await provider.search(provider_request)
@@ -120,4 +121,3 @@ class UniversalSearchCoordinator:
 
 
 universal_search_coordinator = UniversalSearchCoordinator()
-

@@ -55,6 +55,17 @@ class ProviderHealth(BaseModel):
     state: ProviderHealthState
     authenticated: bool = False
     error_code: str | None = None
+    rate_limit: dict[str, object] | None = None
+
+
+class TumblrProviderFilter(BaseModel):
+    mode: Literal["tag", "blog", "blog_tag"] = "tag"
+    blog: str | None = None
+    tag: str | None = None
+
+
+class ProviderFilters(BaseModel):
+    tumblr: TumblrProviderFilter | None = None
 
 
 class ProviderSearchRequest(BaseModel):
@@ -63,6 +74,7 @@ class ProviderSearchRequest(BaseModel):
     include_nsfw: bool = False
     limit: int = Field(default=24, ge=1, le=100)
     sort: UniversalSort = "source_balanced"
+    provider_filters: ProviderFilters = Field(default_factory=ProviderFilters)
 
 
 class UniversalItemCapabilities(BaseModel):
@@ -104,10 +116,11 @@ class ProviderSearchResult(BaseModel):
 class UniversalProviderSummary(BaseModel):
     name: ProviderName
     display_name: str
-    implementation_status: Literal["available", "planned"]
+    implementation_status: Literal["available", "planned", "configuration_required"]
     health: ProviderHealthState
     authenticated: bool
     capabilities: ProviderCapabilities
+    rate_limit: dict[str, object] | None = None
 
 
 class UniversalProviderListResponse(BaseModel):
@@ -121,6 +134,7 @@ class UniversalSearchRequest(BaseModel):
     sort: UniversalSort = "source_balanced"
     include_nsfw: bool = False
     limit_per_provider: int = Field(default=24, ge=1, le=100)
+    provider_filters: ProviderFilters = Field(default_factory=ProviderFilters)
 
     @field_validator("query")
     @classmethod
@@ -161,4 +175,3 @@ class UniversalSearchStatusResponse(UniversalSearchStartResponse):
     items: list[UniversalMediaItem] = []
     created_at: datetime
     updated_at: datetime
-

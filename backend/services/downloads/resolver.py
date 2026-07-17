@@ -91,7 +91,7 @@ async def resolve_download_request(
     job_id: str | None = None,
 ) -> ResolvedDownload:
     started = monotonic()
-    post_id = validate_post_id(request.post_id)
+    post_id = request.post_id if request.provider == "tumblr" else validate_post_id(request.post_id)
     logger.info(
         "download.resolve.start job_id=%s post_id=%s media_type=%s download_scope=%s gallery_index=%s",
         job_id,
@@ -111,7 +111,7 @@ async def resolve_download_request(
         logger.info("download.resolve.cache_miss job_id=%s post_id=%s", job_id, post_id)
         item = _item_from_request(request)
 
-    if _needs_hydration(item, request):
+    if request.provider != "tumblr" and _needs_hydration(item, request):
         logger.info(
             "download.resolve.cache_incomplete job_id=%s post_id=%s cache_hit=%s has_media_url=%s has_post_url=%s has_gallery_metadata=%s has_reddit_video_metadata=%s",
             job_id,
@@ -175,7 +175,7 @@ def _item_from_request(request: DownloadRequest) -> RedditMediaItem:
     return RedditMediaItem(
         id=request.post_id,
         title=request.title or "",
-        subreddit=request.subreddit,
+        subreddit=request.subreddit or request.provider,
         author=request.author,
         permalink=clean_url(request.post_url),
         post_url=clean_url(request.post_url),
@@ -232,7 +232,7 @@ def _resolve_video(item: RedditMediaItem, request: DownloadRequest) -> ResolvedD
     url = clean_url(item.post_url) or clean_url(item.permalink)
     if is_reddit_video_url(item.media_url):
         url = url or item.media_url
-    if choose_download_strategy(item) == "direct":
+    if choose_download_strategy(item) == "direct" or item.provider == "tumblr":
         direct = _required_url(item.media_url, "missing_media_url")
         return _resolved(item, request, "direct", "videos", [direct])
     if not url:
@@ -279,7 +279,7 @@ def _resolve_gallery(item: RedditMediaItem, request: DownloadRequest) -> Resolve
         _validate_direct(url)
     filenames = [
         build_download_filename(
-            subreddit=item.subreddit or request.subreddit,
+            subreddit=item.subreddit or request.subreddit or request.provider,
             author=item.author or request.author,
             title=item.title or request.title,
             post_id=item.id or request.post_id,
@@ -315,7 +315,7 @@ def _resolved(
             raise
     filenames = [
         build_download_filename(
-            subreddit=item.subreddit or request.subreddit,
+            subreddit=item.subreddit or request.subreddit or request.provider,
             author=item.author or request.author,
             title=item.title or request.title,
             post_id=item.id or request.post_id,
@@ -330,7 +330,7 @@ def _resolved(
         filenames=filenames,
         media_type=item.media_type,
         post_id=item.id or request.post_id,
-        provider=item.provider or provider_for_url(urls[0]),
+        provider=item.provider or request.provider or provider_for_url(urls[0]),
         gallery_items=item.gallery_items,
     )
 

@@ -22,7 +22,11 @@ The Vite development server proxies `/api` requests to `http://127.0.0.1:8000`, 
 
 ## Universal Search
 
-The Universal Search page is experimental. Phase 1 renders all planned sources, searches Reddit through the backend adapter, and labels Tumblr, Pinterest, and Instagram as planned. It uses a separate provider-neutral preview modal and intentionally has no Universal download buttons yet. The existing Search page remains the stable Reddit-specific experience.
+The Universal Search page searches Reddit and Tumblr through provider-neutral backend models. Tumblr appears as available when `TUMBLR_CONSUMER_KEY` is configured and as configuration-required otherwise. Pinterest and Instagram remain planned.
+
+Tumblr options appear only when Tumblr is selected. Tags mode is the default; Blog mode accepts a public Tumblr blog name or URL and can include an optional tag. Tumblr results use the shared preview modal and download actions for supported image, GIF, video, and gallery assets. Unsupported Tumblr media keeps the safe source link visible without showing a broken download action.
+
+The existing Search page remains the stable Reddit-specific experience.
 
 ## Production Build
 

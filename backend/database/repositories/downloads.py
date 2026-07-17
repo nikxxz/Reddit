@@ -21,6 +21,7 @@ def create_download_record(
     *,
     job_id: str,
     post_id: str,
+    provider: str = "reddit",
     title: str | None,
     subreddit: str | None,
     author: str | None,
@@ -36,16 +37,17 @@ def create_download_record(
         connection.execute(
             """
             INSERT INTO downloads(
-                id, job_id, post_id, title, subreddit, author, media_type,
+                id, job_id, post_id, provider, title, subreddit, author, media_type,
                 download_scope, status, availability, retry_of_id, resolver_version,
                 created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unknown', ?, 'resolver-v1', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unknown', ?, 'resolver-v1', ?, ?)
             """,
             (
                 download_id,
                 job_id,
                 post_id,
+                provider,
                 title,
                 subreddit,
                 author,
@@ -293,10 +295,10 @@ def thumbnail_for_download(download_id: str) -> sqlite3.Row | None:
         ).fetchone()
 
 
-def find_duplicate(post_id: str, media_type: str, download_scope: str, gallery_index: int | None) -> sqlite3.Row | None:
+def find_duplicate(post_id: str, media_type: str, download_scope: str, gallery_index: int | None, provider: str = "reddit") -> sqlite3.Row | None:
     _ensure_schema()
     media_clause = "" if media_type == "unknown" else "AND d.media_type = ?"
-    values: list[Any] = [post_id]
+    values: list[Any] = [post_id, provider]
     if media_clause:
         values.append(media_type)
     values.extend([download_scope, gallery_index, gallery_index])
@@ -306,6 +308,7 @@ def find_duplicate(post_id: str, media_type: str, download_scope: str, gallery_i
             SELECT d.*
             FROM downloads d
             WHERE d.post_id = ?
+              AND COALESCE(d.provider, 'reddit') = ?
               {media_clause}
               AND d.download_scope = ?
               AND d.status IN ('completed', 'completed_with_errors')

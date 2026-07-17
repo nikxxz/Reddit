@@ -127,6 +127,9 @@ class DownloadJobManager:
             raise DuplicateDownloadError(
                 {
                     "type": "exact_download_exists",
+                    "provider": request.provider,
+                    "provider_item_id": request.post_id,
+                    "media_index": request.gallery_index if request.download_scope == "gallery_current" else None,
                     "existing_download_id": str(duplicate["id"]),
                     "availability": str(duplicate["availability"]),
                 }
@@ -645,6 +648,7 @@ class DownloadJobManager:
         return DownloadJobSummary(
             job_id=job.job_id,
             post_id=job.request.post_id,
+            provider=job.request.provider,
             status=job.status,
             progress=job.progress,
             message=job.message,

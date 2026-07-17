@@ -159,6 +159,7 @@ def _history_summary(row) -> object:
         "id": row["id"],
         "job_id": row["job_id"] or row["id"],
         "post_id": row["post_id"],
+        "provider": row["provider"] or "reddit",
         "status": row["status"],
         "availability": row["availability"],
         "progress": 100 if row["status"] in {"completed", "completed_with_errors"} else None,
