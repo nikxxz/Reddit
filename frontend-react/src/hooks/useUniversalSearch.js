@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getUniversalSearch,
+  loadMorePinterestResults,
   listUniversalProviders,
   startUniversalSearch
 } from "../api/universalSearchApi";
@@ -157,10 +158,37 @@ export function useUniversalSearch() {
       });
   }, [clearPolling, pollSearch]);
 
+  const loadMorePinterest = useCallback(() => {
+    const searchId = state.searchId;
+    if (!searchId || state.polling) {
+      return Promise.resolve(null);
+    }
+    setState((current) => ({ ...current, polling: true }));
+    return loadMorePinterestResults(searchId)
+      .then((response) => {
+        setState((current) => ({
+          ...current,
+          status: response.status,
+          providers: response.providers || current.providers,
+          items: response.items || current.items,
+          polling: false
+        }));
+        return response;
+      })
+      .catch((error) => {
+        setState((current) => ({
+          ...current,
+          polling: false,
+          error: error.message || "Unable to load more Pinterest results."
+        }));
+        return null;
+      });
+  }, [state.polling, state.searchId]);
+
   return {
     state,
     submitSearch,
+    loadMorePinterest,
     reloadProviders: loadProviders
   };
 }
-

@@ -109,6 +109,8 @@ class UniversalSearchCoordinator:
             "failed",
             "not_implemented",
             "authentication_required",
+            "session_required",
+            "extractor_unavailable",
             "rate_limited",
             "unavailable",
         }

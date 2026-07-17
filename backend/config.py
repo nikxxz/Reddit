@@ -95,6 +95,15 @@ class Settings(BaseModel):
     tumblr_max_limit: int = Field(default=50, ge=1, le=50)
     tumblr_cache_ttl_seconds: int = Field(default=120, ge=0)
     tumblr_max_pages_per_search: int = Field(default=3, ge=1, le=10)
+    pinterest_enabled: bool = True
+    pinterest_cookie_file: str | None = None
+    pinterest_request_timeout_seconds: float = Field(default=30, gt=0)
+    pinterest_max_results: int = Field(default=50, ge=1, le=100)
+    pinterest_default_limit: int = Field(default=24, ge=1, le=100)
+    pinterest_max_pages_per_search: int = Field(default=3, ge=1, le=10)
+    pinterest_cache_ttl_seconds: int = Field(default=120, ge=0)
+    pinterest_extractor_timeout_seconds: float = Field(default=45, gt=0)
+    pinterest_max_concurrent_extractions: int = Field(default=2, ge=1)
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None
     reddit_user_agent: str | None = None
@@ -109,15 +118,18 @@ class Settings(BaseModel):
         return normalized
 
     @model_validator(mode="after")
-    def validate_tumblr_limits(self) -> "Settings":
+    def validate_provider_limits(self) -> "Settings":
         if self.tumblr_default_limit > self.tumblr_max_limit:
             raise ValueError("TUMBLR_DEFAULT_LIMIT must be less than or equal to TUMBLR_MAX_LIMIT")
+        if self.pinterest_default_limit > self.pinterest_max_results:
+            raise ValueError("PINTEREST_DEFAULT_LIMIT must be less than or equal to PINTEREST_MAX_RESULTS")
         return self
 
     @field_validator(
         "library_reconcile_on_startup",
         "generate_missing_thumbnails_on_startup",
         "debug",
+        "pinterest_enabled",
         mode="before",
     )
     @classmethod
@@ -151,6 +163,22 @@ class Settings(BaseModel):
         if not path.is_absolute():
             path = BASE_DIR / path
         return path
+
+    @property
+    def app_data_dir_path(self) -> Path:
+        path = Path(self.app_data_dir)
+        if not path.is_absolute():
+            path = BASE_DIR / path
+        return path
+
+    @property
+    def pinterest_cookie_file_path(self) -> Path:
+        if self.pinterest_cookie_file:
+            path = Path(self.pinterest_cookie_file)
+            if path.is_absolute():
+                return path
+            return BASE_DIR / path
+        return self.app_data_dir_path / "sessions" / "pinterest" / "cookies.txt"
 
 
 ENV_FIELDS = {
@@ -212,6 +240,15 @@ ENV_FIELDS = {
     "TUMBLR_MAX_LIMIT": ("tumblr_max_limit", int),
     "TUMBLR_CACHE_TTL_SECONDS": ("tumblr_cache_ttl_seconds", int),
     "TUMBLR_MAX_PAGES_PER_SEARCH": ("tumblr_max_pages_per_search", int),
+    "PINTEREST_ENABLED": ("pinterest_enabled", str),
+    "PINTEREST_COOKIE_FILE": ("pinterest_cookie_file", str),
+    "PINTEREST_REQUEST_TIMEOUT_SECONDS": ("pinterest_request_timeout_seconds", float),
+    "PINTEREST_MAX_RESULTS": ("pinterest_max_results", int),
+    "PINTEREST_DEFAULT_LIMIT": ("pinterest_default_limit", int),
+    "PINTEREST_MAX_PAGES_PER_SEARCH": ("pinterest_max_pages_per_search", int),
+    "PINTEREST_CACHE_TTL_SECONDS": ("pinterest_cache_ttl_seconds", int),
+    "PINTEREST_EXTRACTOR_TIMEOUT_SECONDS": ("pinterest_extractor_timeout_seconds", float),
+    "PINTEREST_MAX_CONCURRENT_EXTRACTIONS": ("pinterest_max_concurrent_extractions", int),
     "REDDIT_CLIENT_ID": ("reddit_client_id", str),
     "REDDIT_CLIENT_SECRET": ("reddit_client_secret", str),
     "REDDIT_USER_AGENT": ("reddit_user_agent", str),

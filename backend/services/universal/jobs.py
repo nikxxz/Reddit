@@ -7,6 +7,7 @@ from uuid import uuid4
 from backend.config import settings
 from backend.models.universal_search import (
     ProviderJobSummary,
+    ProviderSearchRequest,
     UniversalMediaItem,
     UniversalSearchRequest,
     UniversalSearchStartResponse,
@@ -84,6 +85,35 @@ class UniversalSearchJobManager:
             created_at=job.created_at,
             updated_at=job.updated_at,
         )
+
+    async def load_more_provider(self, search_id: str, provider_name: str) -> UniversalSearchStatusResponse | None:
+        job = self._jobs.get(search_id)
+        if not job:
+            return None
+        if provider_name != "pinterest":
+            return None
+        existing_provider_items = [item for item in job.items if item.provider == provider_name]
+        provider = universal_provider_registry.get(provider_name)
+        request = ProviderSearchRequest(
+            query=job.request.query,
+            media_types=job.request.media_types,
+            include_nsfw=job.request.include_nsfw,
+            limit=job.request.limit_per_provider,
+            sort=job.request.sort,
+            provider_filters=job.request.provider_filters,
+            cursor=f"offset:{len(existing_provider_items)}",
+        )
+        result = await provider.search(request)
+        known = {(item.provider, item.provider_item_id) for item in job.items}
+        new_items = [item for item in result.items if (item.provider, item.provider_item_id) not in known]
+        job.items.extend(new_items)
+        job.providers[provider_name] = ProviderJobSummary(
+            status=result.status,
+            result_count=len(existing_provider_items) + len(new_items),
+            error=result.error_code,
+        )
+        job.updated_at = datetime.now(timezone.utc)
+        return self.get(search_id)
 
     def cleanup_jobs(self) -> int:
         now = datetime.now(timezone.utc)

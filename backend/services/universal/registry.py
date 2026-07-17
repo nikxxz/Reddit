@@ -4,7 +4,7 @@ from backend.models.universal_search import UniversalProviderSummary
 from backend.services.universal.base import UniversalMediaProvider
 from backend.services.universal.errors import DuplicateProviderError, UnknownProviderError
 from backend.services.universal.providers.instagram_placeholder import InstagramPlaceholderProvider
-from backend.services.universal.providers.pinterest_placeholder import PinterestPlaceholderProvider
+from backend.services.universal.providers.pinterest import pinterest_provider
 from backend.services.universal.providers.reddit_adapter import RedditUniversalProvider
 from backend.services.universal.providers.tumblr import TumblrUniversalProvider
 
@@ -49,7 +49,7 @@ def create_default_registry() -> UniversalProviderRegistry:
     registry = UniversalProviderRegistry()
     registry.register(RedditUniversalProvider())
     registry.register(TumblrUniversalProvider())
-    registry.register(PinterestPlaceholderProvider())
+    registry.register(pinterest_provider)
     registry.register(InstagramPlaceholderProvider())
     return registry
 

@@ -22,9 +22,13 @@ The Vite development server proxies `/api` requests to `http://127.0.0.1:8000`, 
 
 ## Universal Search
 
-The Universal Search page searches Reddit and Tumblr through provider-neutral backend models. Tumblr appears as available when `TUMBLR_CONSUMER_KEY` is configured and as configuration-required otherwise. Pinterest and Instagram remain planned.
+The Universal Search page searches Reddit, Tumblr, and Pinterest through provider-neutral backend models. Tumblr appears as available when `TUMBLR_CONSUMER_KEY` is configured and as configuration-required otherwise. Pinterest appears as available when the provider code is installed, then reports `ready`, `session_required`, or `extractor_unavailable` based on `gallery-dl` and cookies. Instagram remains planned.
 
 Tumblr options appear only when Tumblr is selected. Tags mode is the default; Blog mode accepts a public Tumblr blog name or URL and can include an optional tag. Tumblr results use the shared preview modal and download actions for supported image, GIF, video, and gallery assets. Unsupported Tumblr media keeps the safe source link visible without showing a broken download action.
+
+Pinterest options appear only when Pinterest is selected. Search mode uses the global query; Pin URL, Profile, and Board modes show their own fields. Pinterest image, video, and story/multi-asset Pins can be previewed, but download buttons are intentionally absent in Phase 3A.
+
+Settings includes a Pinterest source card for importing, testing, replacing, and clearing a manually exported Netscape `cookies.txt` file. The UI never displays raw cookie values or local cookie paths.
 
 The existing Search page remains the stable Reddit-specific experience.
 

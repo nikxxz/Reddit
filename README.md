@@ -12,7 +12,7 @@ The authoritative frontend is `frontend-react/`, built with React, Vite, and Man
 - Media-type filters for images, GIFs, videos, external media, and galleries
 - NSFW filtering
 - Responsive media grid with preview modal and gallery carousel
-- Universal Search page with provider-neutral Reddit and Tumblr results
+- Universal Search page with provider-neutral Reddit, Tumblr, and Pinterest preview results
 - Downloads for images, GIFs, videos, supported external media, and galleries
 - Background download jobs with progress, result files, failures, and cancellation
 - SQLite-backed persistent download history with portable relative file paths
@@ -67,6 +67,7 @@ app-data/
 - Python 3.10 or newer. This repository is currently validated on Python 3.10.
 - Node.js and npm for the React frontend.
 - `yt-dlp` is required for video and supported external-media downloads.
+- `gallery-dl==1.27.7` is used for Pinterest metadata extraction.
 - FFmpeg is recommended for media that requires audio/video merging. The app starts without FFmpeg; diagnostics report it as missing, image downloads still work, and affected video merges fail with a clear download error.
 
 ## Setup On Windows PowerShell
@@ -202,8 +203,12 @@ GET /api/ready
 POST /api/library/reconcile
 GET /api/library/reconcile/status
 GET /api/universal/providers
+POST /api/universal/providers/pinterest/session
+POST /api/universal/providers/pinterest/session/test
+DELETE /api/universal/providers/pinterest/session
 POST /api/universal/search
 GET /api/universal/search/{search_id}
+POST /api/universal/search/{search_id}/providers/pinterest/more
 ```
 
 The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, writability, schema version, expected schema version, migration-required state, safe database error code, backup availability, lifecycle readiness, reconciliation state, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
@@ -212,7 +217,7 @@ Startup uses FastAPI lifespan. Critical path and database checks complete before
 
 ## Universal Search
 
-Universal Search is a provider-neutral media search page. It supports Reddit through the existing Reddit adapter and Tumblr through the official Tumblr API. Pinterest and Instagram remain planned placeholders.
+Universal Search is a provider-neutral media search page. It supports Reddit through the existing Reddit adapter, Tumblr through the official Tumblr API, and Pinterest preview/search through `gallery-dl` metadata extraction. Instagram remains planned.
 
 Tumblr search is tag-oriented: a normal Universal query such as `digital art` is sent as one Tumblr tag unless the Tumblr tag override is filled in. Tumblr also supports public-blog browsing by blog name or URL, with optional tag filtering where the API supports it.
 
@@ -227,6 +232,12 @@ Optional OAuth fields are present in `.env.example` for future OAuth-only conten
 Supported Tumblr media includes NPF and legacy images, GIFs, videos with direct Tumblr media URLs, photosets/galleries, and mixed-media posts. External Tumblr video posts may preview with a poster but disable direct download when no trusted direct media URL is available. Tumblr downloads use the existing download manager, status lifecycle, duplicate checks, retry lineage, cancellation, local thumbnails, and provider-aware history.
 
 If Tumblr rate-limits requests, the provider reports `rate_limited` safely and Reddit results remain available. Retry timing is exposed only when Tumblr returns a trustworthy value.
+
+Pinterest search is preview-only in this milestone. It supports keyword search, Pin URL lookup, profile browsing, board browsing, and Pinterest-only load more. Image Pins, video Pins, and story or multi-asset Pins are normalized into Universal result cards and the shared preview modal. Pinterest downloads, duplicate detection, and history persistence are deferred to a later milestone.
+
+Pinterest uses `gallery-dl==1.27.7` in metadata mode through a bounded subprocess invocation. The app passes argument arrays, does not use `shell=True`, limits result ranges, captures JSON output, enforces timeouts, and does not allow browser-supplied extractor options. `gallery-dl` extractors can change when Pinterest changes its site; upgrade by changing the pinned dependency, running the mocked tests, and manually validating a low-volume local search.
+
+Pinterest often requires an authenticated browser session. Import a Netscape-format `cookies.txt` file in Settings under Pinterest source. The app stores it at `app-data/sessions/pinterest/cookies.txt` unless `PINTEREST_COOKIE_FILE` is configured. Cookie values are not stored in SQLite, returned to React, or printed in responses. You can replace, test, or clear the Pinterest session from Settings.
 
 The existing Search page remains the stable full-featured Reddit search surface, including subreddit browsing, Reddit-specific filters, previews, downloads, history behavior, and OAuth flow.
 
@@ -276,9 +287,11 @@ This is a local personal tool. Treat it as host-machine access to downloads and 
 ## Current Limitations
 
 - Automatic orphan-file import is not implemented.
-- Pinterest and Instagram Universal Search providers are still planned.
+- Pinterest Universal Search downloads are not implemented yet; Pinterest support is search and preview only.
 - Some Tumblr external-video posts cannot be directly downloaded unless Tumblr exposes a trusted direct media URL.
 - OAuth-only Tumblr content is not covered by the current public-read provider.
+- Pinterest support depends on `gallery-dl` extractor behavior and a valid manually imported session when Pinterest requires login.
+- Instagram Universal Search remains planned.
 - Gallery "download missing items" is detected as partial history but queued as a full retry in this milestone.
 - The legacy frontend is archived under `legacy/frontend/` and is not served by FastAPI.
 - OAuth redirect behavior across LAN devices depends on matching Reddit app callback configuration.

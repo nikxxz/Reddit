@@ -168,11 +168,15 @@ function UniversalPreviewBody({ item, previewItem, metadata, sourceUrl }) {
                   leftSection={<IconExternalLink size={16} stroke={1.8} />}
                   variant="subtle"
                 >
-                  Open source
+                  {item.provider === "pinterest" ? "Open on Pinterest" : item.provider === "tumblr" ? "Open on Tumblr" : "Open source"}
                 </Button>
               ) : null}
-              {item.capabilities?.download_single ? (
+              {item.provider !== "pinterest" && item.capabilities?.download_single ? (
                 <UniversalDownloadControls item={item} previewItem={previewItem} activeGalleryIndex={activeGalleryIndex} />
+              ) : item.provider === "pinterest" ? (
+                <Text size="sm" c="gray.6">
+                  Pinterest downloads will be added in the next milestone.
+                </Text>
               ) : (
                 <Text size="sm" c="gray.6">
                   Universal downloads will be added in a later phase.

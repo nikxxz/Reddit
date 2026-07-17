@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getUniversalSearch,
+  loadMorePinterestResults,
   listUniversalProviders,
   startUniversalSearch
 } from "../api/universalSearchApi";
@@ -11,7 +12,8 @@ import { UniversalSearchPage } from "./UniversalSearchPage";
 vi.mock("../api/universalSearchApi", () => ({
   listUniversalProviders: vi.fn(),
   startUniversalSearch: vi.fn(),
-  getUniversalSearch: vi.fn()
+  getUniversalSearch: vi.fn(),
+  loadMorePinterestResults: vi.fn()
 }));
 
 const providers = [
@@ -96,6 +98,17 @@ describe("UniversalSearchPage", () => {
       created_at: "2026-07-17T10:00:00Z",
       updated_at: "2026-07-17T10:00:01Z"
     });
+    loadMorePinterestResults.mockResolvedValue({
+      search_id: "search-1",
+      status: "completed_with_errors",
+      providers: {
+        reddit: { status: "completed", result_count: 1, error: null },
+        pinterest: { status: "completed", result_count: 1, error: null }
+      },
+      items: [redditItem],
+      created_at: "2026-07-17T10:00:00Z",
+      updated_at: "2026-07-17T10:00:02Z"
+    });
   });
 
   it("renders all provider selectors and labels planned providers", async () => {
@@ -129,6 +142,16 @@ describe("UniversalSearchPage", () => {
     expect(await screen.findByText("Universal cat")).toBeInTheDocument();
     expect(screen.getByText("Reddit - wallpapers")).toBeInTheDocument();
     expect(screen.getAllByText("Planned").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("shows Pinterest options only when Pinterest is selected", async () => {
+    renderWithProviders(<UniversalSearchPage />);
+
+    expect(await screen.findByText("Pinterest options")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("Pinterest mode").at(-1)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Pinterest/ }));
+    expect(screen.queryByText("Pinterest options")).not.toBeInTheDocument();
   });
 
   it("opens a Universal preview without download buttons", async () => {

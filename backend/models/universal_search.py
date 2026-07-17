@@ -14,6 +14,8 @@ ProviderHealthState = Literal[
     "unavailable",
     "not_implemented",
     "authentication_required",
+    "session_required",
+    "extractor_unavailable",
     "rate_limited",
     "degraded",
     "failed",
@@ -25,6 +27,8 @@ ProviderJobStatus = Literal[
     "no_results",
     "not_implemented",
     "authentication_required",
+    "session_required",
+    "extractor_unavailable",
     "rate_limited",
     "unavailable",
     "failed",
@@ -64,8 +68,17 @@ class TumblrProviderFilter(BaseModel):
     tag: str | None = None
 
 
+class PinterestProviderFilter(BaseModel):
+    mode: Literal["search", "pin", "profile", "board", "section"] = "search"
+    profile: str | None = None
+    board: str | None = None
+    section: str | None = None
+    pin_url: str | None = None
+
+
 class ProviderFilters(BaseModel):
     tumblr: TumblrProviderFilter | None = None
+    pinterest: PinterestProviderFilter | None = None
 
 
 class ProviderSearchRequest(BaseModel):
@@ -75,6 +88,7 @@ class ProviderSearchRequest(BaseModel):
     limit: int = Field(default=24, ge=1, le=100)
     sort: UniversalSort = "source_balanced"
     provider_filters: ProviderFilters = Field(default_factory=ProviderFilters)
+    cursor: str | None = None
 
 
 class UniversalItemCapabilities(BaseModel):
@@ -101,6 +115,7 @@ class UniversalMediaItem(BaseModel):
     duration_seconds: int | None = None
     created_at: datetime | None = None
     nsfw: bool = False
+    safety_unknown: bool = False
     source_metadata: dict[str, object] = {}
     capabilities: UniversalItemCapabilities = Field(default_factory=UniversalItemCapabilities)
 

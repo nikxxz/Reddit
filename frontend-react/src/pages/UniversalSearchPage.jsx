@@ -38,7 +38,7 @@ const SORT_OPTIONS = [
 ];
 
 export function UniversalSearchPage() {
-  const { state, submitSearch } = useUniversalSearch();
+  const { state, submitSearch, loadMorePinterest } = useUniversalSearch();
   const preview = useMediaPreview();
   const isMobile = useMediaQuery("(max-width: 40em)");
   const [query, setQuery] = useState("");
@@ -49,6 +49,10 @@ export function UniversalSearchPage() {
   const [tumblrMode, setTumblrMode] = useState("tag");
   const [tumblrBlog, setTumblrBlog] = useState("");
   const [tumblrTag, setTumblrTag] = useState("");
+  const [pinterestMode, setPinterestMode] = useState("search");
+  const [pinterestPinUrl, setPinterestPinUrl] = useState("");
+  const [pinterestProfile, setPinterestProfile] = useState("");
+  const [pinterestBoard, setPinterestBoard] = useState("");
   const [validationError, setValidationError] = useState("");
 
   const providerMap = useMemo(
@@ -75,6 +79,18 @@ export function UniversalSearchPage() {
       setValidationError("Enter a valid Tumblr blog name or URL.");
       return;
     }
+    if (providers.includes("pinterest") && pinterestMode === "pin" && !normalizePinterestPinUrl(pinterestPinUrl)) {
+      setValidationError("Enter a valid Pinterest Pin URL.");
+      return;
+    }
+    if (providers.includes("pinterest") && pinterestMode === "profile" && !normalizePinterestIdentifier(pinterestProfile)) {
+      setValidationError("Enter a valid Pinterest profile.");
+      return;
+    }
+    if (providers.includes("pinterest") && pinterestMode === "board" && !normalizePinterestBoard(pinterestBoard)) {
+      setValidationError("Enter a valid Pinterest board.");
+      return;
+    }
     setValidationError("");
     submitSearch({
       query: cleanQuery,
@@ -88,6 +104,13 @@ export function UniversalSearchPage() {
           mode: tumblrMode === "blog" && (tumblrTag.trim() || cleanQuery) ? "blog_tag" : tumblrMode,
           blog: tumblrMode === "tag" ? null : tumblrBlog.trim(),
           tag: tumblrTag.trim() || null
+        },
+        pinterest: {
+          mode: pinterestMode,
+          pin_url: pinterestMode === "pin" ? pinterestPinUrl.trim() : null,
+          profile: pinterestMode === "profile" ? pinterestProfile.trim() : null,
+          board: pinterestMode === "board" ? pinterestBoard.trim() : null,
+          section: null
         }
       }
     });
@@ -227,6 +250,58 @@ export function UniversalSearchPage() {
                     </Stack>
                   </Paper>
                 ) : null}
+
+                {providers.includes("pinterest") ? (
+                  <Paper className="universal-provider-options" withBorder p="sm" radius="sm">
+                    <Stack gap="sm">
+                      <Group justify="space-between" gap="sm">
+                        <Text fw={700} size="sm">Pinterest options</Text>
+                        <Badge variant="light">Preview only</Badge>
+                      </Group>
+                      <Group className="universal-filter-row" gap="md" align="flex-end">
+                        <Select
+                          label="Pinterest mode"
+                          data={[
+                            { value: "search", label: "Search" },
+                            { value: "pin", label: "Pin URL" },
+                            { value: "profile", label: "Profile" },
+                            { value: "board", label: "Board" }
+                          ]}
+                          value={pinterestMode}
+                          onChange={(value) => setPinterestMode(value || "search")}
+                          allowDeselect={false}
+                        />
+                        {pinterestMode === "pin" ? (
+                          <TextInput
+                            label="Pin URL"
+                            value={pinterestPinUrl}
+                            onChange={(event) => setPinterestPinUrl(event.currentTarget.value)}
+                            error={pinterestPinUrl && !normalizePinterestPinUrl(pinterestPinUrl) ? "Use a Pinterest Pin URL." : undefined}
+                            placeholder="https://www.pinterest.com/pin/123/"
+                          />
+                        ) : null}
+                        {pinterestMode === "profile" ? (
+                          <TextInput
+                            label="Profile"
+                            value={pinterestProfile}
+                            onChange={(event) => setPinterestProfile(event.currentTarget.value)}
+                            error={pinterestProfile && !normalizePinterestIdentifier(pinterestProfile) ? "Use a Pinterest username or profile URL." : undefined}
+                            placeholder="pinterest or https://www.pinterest.com/pinterest/"
+                          />
+                        ) : null}
+                        {pinterestMode === "board" ? (
+                          <TextInput
+                            label="Board"
+                            value={pinterestBoard}
+                            onChange={(event) => setPinterestBoard(event.currentTarget.value)}
+                            error={pinterestBoard && !normalizePinterestBoard(pinterestBoard) ? "Use username/board or a board URL." : undefined}
+                            placeholder="username/board-name"
+                          />
+                        ) : null}
+                      </Group>
+                    </Stack>
+                  </Paper>
+                ) : null}
               </Stack>
             </form>
           </Stack>
@@ -260,7 +335,14 @@ export function UniversalSearchPage() {
                     {summaryText(state)}
                   </Text>
                 </Stack>
-                {state.polling ? <Badge variant="light">Updating</Badge> : null}
+                <Group gap="xs">
+                  {state.providers?.pinterest?.result_count ? (
+                    <Button size="xs" variant="light" onClick={loadMorePinterest} disabled={state.polling}>
+                      Load more Pinterest
+                    </Button>
+                  ) : null}
+                  {state.polling ? <Badge variant="light">Updating</Badge> : null}
+                </Group>
               </Group>
 
               {state.items.length ? (
@@ -321,6 +403,50 @@ function hasControlCharacter(value) {
   return [...value].some((char) => char.charCodeAt(0) < 32);
 }
 
+function normalizePinterestPinUrl(value) {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" && (
+      (url.hostname.endsWith("pinterest.com") && /\/pin\/\d+\/?/.test(url.pathname))
+      || url.hostname === "pin.it"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizePinterestIdentifier(value) {
+  const raw = value.trim();
+  if (!raw || hasControlCharacter(raw)) {
+    return false;
+  }
+  try {
+    if (/^https:\/\//i.test(raw)) {
+      const url = new URL(raw);
+      return url.hostname.endsWith("pinterest.com") && Boolean(url.pathname.split("/").filter(Boolean)[0]);
+    }
+  } catch {
+    return false;
+  }
+  return /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,29}$/.test(raw.replace(/^@/, ""));
+}
+
+function normalizePinterestBoard(value) {
+  const raw = value.trim();
+  if (!raw || hasControlCharacter(raw)) {
+    return false;
+  }
+  try {
+    if (/^https:\/\//i.test(raw)) {
+      const url = new URL(raw);
+      return url.hostname.endsWith("pinterest.com") && url.pathname.split("/").filter(Boolean).length >= 2;
+    }
+  } catch {
+    return false;
+  }
+  return raw.split("/").filter(Boolean).length >= 2;
+}
+
 function ProviderStatusBar({ providerMap, providerStates }) {
   return (
     <div className="universal-provider-status" aria-label="Provider status">
@@ -377,6 +503,8 @@ function statusLabel(status, resultCount) {
     unavailable: "Unavailable",
     authentication_required: "Auth required",
     rate_limited: "Rate limited",
+    session_required: "Session required",
+    extractor_unavailable: "Extractor missing",
     degraded: "Degraded"
   }[status] || "Unavailable";
 }
@@ -390,6 +518,9 @@ function statusColor(status) {
   }
   if (status === "not_implemented") {
     return "gray";
+  }
+  if (status === "session_required") {
+    return "yellow";
   }
   return "red";
 }
