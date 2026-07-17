@@ -20,6 +20,10 @@ npm.cmd run dev
 
 The Vite development server proxies `/api` requests to `http://127.0.0.1:8000`, preserving the `/api` path. React API modules use relative paths and do not call Reddit directly.
 
+## Universal Search
+
+The Universal Search page is experimental. Phase 1 renders all planned sources, searches Reddit through the backend adapter, and labels Tumblr, Pinterest, and Instagram as planned. It uses a separate provider-neutral preview modal and intentionally has no Universal download buttons yet. The existing Search page remains the stable Reddit-specific experience.
+
 ## Production Build
 
 ```powershell

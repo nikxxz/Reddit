@@ -13,6 +13,7 @@ from backend.routes.health import router as health_router
 from backend.routes.library import router as library_router
 from backend.routes.reddit import router as reddit_router
 from backend.routes.system import router as system_router
+from backend.routes.universal_search import router as universal_search_router
 from backend.services.background import background_task_registry
 from backend.services.downloads.manager import download_job_manager
 from backend.services.lifecycle import application_lifecycle
@@ -79,6 +80,7 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.include_router(health_router, prefix="/api")
 app.include_router(reddit_router, prefix="/api")
+app.include_router(universal_search_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(downloads_router, prefix="/api")
 app.include_router(library_router, prefix="/api")

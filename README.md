@@ -12,6 +12,7 @@ The authoritative frontend is `frontend-react/`, built with React, Vite, and Man
 - Media-type filters for images, GIFs, videos, external media, and galleries
 - NSFW filtering
 - Responsive media grid with preview modal and gallery carousel
+- Experimental Universal Search page with provider-neutral Reddit results
 - Downloads for images, GIFs, videos, supported external media, and galleries
 - Background download jobs with progress, result files, failures, and cancellation
 - SQLite-backed persistent download history with portable relative file paths
@@ -200,11 +201,20 @@ GET /api/system/status
 GET /api/ready
 POST /api/library/reconcile
 GET /api/library/reconcile/status
+GET /api/universal/providers
+POST /api/universal/search
+GET /api/universal/search/{search_id}
 ```
 
 The response reports FFmpeg availability, yt-dlp availability, download-directory readiness, writable status, free space, configured minimum free space, active download count, queued download count, database readiness, writability, schema version, expected schema version, migration-required state, safe database error code, backup availability, lifecycle readiness, reconciliation state, library counts, and thumbnail-directory readiness. It does not expose absolute filesystem paths, environment values, OAuth tokens, secrets, usernames, command lines, or internal IP addresses.
 
 Startup uses FastAPI lifespan. Critical path and database checks complete before readiness is reported, while library reconciliation and maintenance run in retained background tasks. Shutdown rejects new downloads, cancels queued jobs, interrupts active jobs with `interrupted_by_shutdown`, stops maintenance tasks, and waits for a bounded grace period.
+
+## Universal Search
+
+Universal Search is an experimental page for provider-neutral media search. Phase 1 supports Reddit results through an adapter around the existing Reddit search service. Tumblr, Pinterest, and Instagram are visible as planned providers and report `not_implemented`; they do not perform live searches yet.
+
+The existing Search page remains the stable full-featured Reddit search surface, including subreddit browsing, Reddit-specific filters, previews, downloads, history behavior, and OAuth flow. Universal Search has a separate preview flow and does not include Universal downloads or Universal history in this phase.
 
 ## Development Workflow
 
@@ -252,6 +262,7 @@ This is a local personal tool. Treat it as host-machine access to downloads and 
 ## Current Limitations
 
 - Automatic orphan-file import is not implemented.
+- Universal Search currently searches Reddit only; Tumblr, Pinterest, Instagram, Universal downloads, and Universal history are planned.
 - Gallery "download missing items" is detected as partial history but queued as a full retry in this milestone.
 - The legacy frontend is archived under `legacy/frontend/` and is not served by FastAPI.
 - OAuth redirect behavior across LAN devices depends on matching Reddit app callback configuration.

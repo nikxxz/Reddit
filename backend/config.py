@@ -78,6 +78,11 @@ class Settings(BaseModel):
     search_limit: int = Field(default=24, ge=1)
     search_fetch_multiplier: int = Field(default=3, ge=1)
     search_syntax: str = "lucene"
+    universal_search_retention_minutes: float = Field(default=30, ge=0)
+    universal_search_max_jobs: int = Field(default=100, ge=1)
+    universal_search_max_concurrency: int = Field(default=4, ge=1)
+    universal_search_default_limit: int = Field(default=24, ge=1, le=100)
+    universal_search_max_limit: int = Field(default=100, ge=1, le=100)
     max_concurrent_downloads: int = Field(default=2, ge=1)
     reddit_client_id: str | None = None
     reddit_client_secret: str | None = None
@@ -173,6 +178,11 @@ ENV_FIELDS = {
     "SEARCH_LIMIT": ("search_limit", int),
     "SEARCH_FETCH_MULTIPLIER": ("search_fetch_multiplier", int),
     "SEARCH_SYNTAX": ("search_syntax", str),
+    "UNIVERSAL_SEARCH_RETENTION_MINUTES": ("universal_search_retention_minutes", float),
+    "UNIVERSAL_SEARCH_MAX_JOBS": ("universal_search_max_jobs", int),
+    "UNIVERSAL_SEARCH_MAX_CONCURRENCY": ("universal_search_max_concurrency", int),
+    "UNIVERSAL_SEARCH_DEFAULT_LIMIT": ("universal_search_default_limit", int),
+    "UNIVERSAL_SEARCH_MAX_LIMIT": ("universal_search_max_limit", int),
     "MAX_CONCURRENT_DOWNLOADS": ("max_concurrent_downloads", int),
     "REDDIT_CLIENT_ID": ("reddit_client_id", str),
     "REDDIT_CLIENT_SECRET": ("reddit_client_secret", str),

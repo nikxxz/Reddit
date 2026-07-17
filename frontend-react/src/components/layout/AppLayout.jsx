@@ -3,6 +3,7 @@ import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { useState } from "react";
 import { DownloadsPage } from "../../pages/DownloadsPage";
 import { SearchPage } from "../../pages/SearchPage";
+import { UniversalSearchPage } from "../../pages/UniversalSearchPage";
 import { useDownloads } from "../../hooks/useDownloads";
 import { DownloadTray } from "../downloads/DownloadTray";
 import { AppHeader } from "./AppHeader";
@@ -72,6 +73,9 @@ export function AppLayout({
       <AppShell.Main className="app-main">
         <div hidden={activeSection !== "search"}>
           <SearchPage />
+        </div>
+        <div hidden={activeSection !== "universal-search"}>
+          <UniversalSearchPage />
         </div>
         <div hidden={activeSection !== "downloads"}>
           <DownloadsPage />

@@ -12,13 +12,15 @@ import {
   IconDownload,
   IconHistory,
   IconSearch,
-  IconSettings
+  IconSettings,
+  IconWorldSearch
 } from "@tabler/icons-react";
 import { RedditAccountSection } from "../account/RedditAccountSection";
 import { ConnectionSummary } from "./ConnectionSummary";
 
 const NAV_ITEMS = [
   { value: "search", label: "Search", icon: IconSearch },
+  { value: "universal-search", label: "Universal Search", icon: IconWorldSearch },
   { value: "downloads", label: "Downloads", icon: IconDownload },
   { value: "history", label: "History", icon: IconHistory },
   { value: "settings", label: "Settings", icon: IconSettings }

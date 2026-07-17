@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { searchRedditMedia } from "../../api/redditSearchApi";
 import { listDownloads } from "../../api/downloadsApi";
+import { listUniversalProviders } from "../../api/universalSearchApi";
 import { DownloadJobsProvider } from "../../hooks/useDownloads";
 import { renderWithProviders } from "../../test/render";
 import { AppLayout } from "./AppLayout";
@@ -16,6 +17,12 @@ vi.mock("../../api/downloadsApi", () => ({
   clearDownloads: vi.fn(),
   clearTerminalDownloads: vi.fn(),
   retryDownload: vi.fn()
+}));
+
+vi.mock("../../api/universalSearchApi", () => ({
+  listUniversalProviders: vi.fn(),
+  startUniversalSearch: vi.fn(),
+  getUniversalSearch: vi.fn()
 }));
 
 const connections = {
@@ -52,6 +59,7 @@ describe("AppLayout page persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listDownloads.mockResolvedValue({ jobs: [] });
+    listUniversalProviders.mockResolvedValue({ providers: [] });
     searchRedditMedia.mockResolvedValue({
       items: [
         {

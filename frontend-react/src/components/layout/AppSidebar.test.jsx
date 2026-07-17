@@ -16,6 +16,20 @@ const redditAuth = {
 };
 
 describe("AppSidebar", () => {
+  it("renders the Universal Search navigation item", () => {
+    renderWithProviders(
+      <AppSidebar
+        activeDownloadCount={0}
+        activeSection="search"
+        connections={connections}
+        redditAuth={redditAuth}
+        onSelectSection={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Universal Search")).toBeInTheDocument();
+  });
+
   it("shows active download count on the downloads item", () => {
     renderWithProviders(
       <AppSidebar
